@@ -1,0 +1,462 @@
+/* ================================================================
+   Invincible Studio — style.css
+   Custom styles that supplement Tailwind utility classes.
+
+   WHY THIS FILE EXISTS:
+   Tailwind covers most styling via utility classes in JSX, but
+   some patterns — pseudo-elements (::before), keyframes,
+   complex transitions, and global resets — are easier to write
+   in plain CSS. This file handles exactly those cases.
+
+   HOW IT LOADS:
+   index.php loads this file AFTER Tailwind CDN so any rule
+   here that needs to override Tailwind will win naturally.
+   ================================================================ */
+
+
+/* ----------------------------------------------------------------
+   RESET & GLOBAL BASE
+   box-sizing: border-box means padding/border are INCLUDED in
+   an element's stated width/height (the sane default).
+   margin: 0 removes browser default spacing everywhere.
+   ---------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  /* scroll-behavior: smooth makes anchor links (#section) scroll
+     smoothly instead of jumping instantly */
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #09090b;
+  color: #f4f4f5;
+  font-family: 'DM Sans', sans-serif;
+  /* overflow-x: hidden prevents horizontal scrollbars caused by
+     elements (like orbs) that bleed off the right edge */
+  overflow-x: hidden;
+}
+
+
+/* ----------------------------------------------------------------
+   NOISE TEXTURE OVERLAY
+   A subtle grain effect layered over the entire page using a
+   pseudo-element. It sits in front of the background but behind
+   all real content (pointer-events: none means it cannot be
+   clicked or interacted with).
+   The SVG generates procedural noise via feTurbulence filter.
+   ---------------------------------------------------------------- */
+body::before {
+  content: '';           /* pseudo-elements must have content    */
+  position: fixed;       /* stays put even when page scrolls     */
+  inset: 0;              /* shorthand for top/right/bottom/left:0 */
+  z-index: 0;            /* above background, below content      */
+  pointer-events: none;  /* clicks pass through to real elements */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
+
+/* ----------------------------------------------------------------
+   SCROLL REVEAL SYSTEM
+   Elements start invisible and shifted down 30px (.reveal).
+   When JavaScript's IntersectionObserver detects them on screen
+   it adds the .visible class — CSS transition then animates them
+   into their final position.
+   .reveal-delay-* classes stagger children inside a grid so they
+   cascade in rather than all appearing at once.
+   ---------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Delay helpers — apply to individual grid children */
+.reveal-delay-1 { transition-delay: 0.10s; }
+.reveal-delay-2 { transition-delay: 0.20s; }
+.reveal-delay-3 { transition-delay: 0.30s; }
+.reveal-delay-4 { transition-delay: 0.40s; }
+
+
+/* ----------------------------------------------------------------
+   GRADIENT TEXT
+   background-clip: text clips the gradient to the text shape.
+   -webkit-text-fill-color: transparent makes the text itself
+   transparent so the gradient shows through instead of the
+   normal text colour.
+   ---------------------------------------------------------------- */
+.grad-text {
+  background: linear-gradient(135deg, #6ee7f7 0%, #a3e635 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+
+/* ----------------------------------------------------------------
+   GRID BACKGROUND
+   A faint cyan grid drawn with CSS gradients — used in the hero
+   and CTA sections to add depth without images.
+   ---------------------------------------------------------------- */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(110, 231, 247, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(110, 231, 247, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+
+/* ----------------------------------------------------------------
+   NAVBAR
+   Starts fully transparent. The .scrolled class is added by React
+   once the user scrolls past 40px, revealing a blurred backdrop.
+   ---------------------------------------------------------------- */
+#navbar {
+  transition: background 0.3s ease, backdrop-filter 0.3s ease, border-color 0.3s ease;
+}
+
+#navbar.scrolled {
+  background: rgba(9, 9, 11, 0.85);
+  backdrop-filter: blur(20px);       /* frosted-glass effect */
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(42, 42, 50, 0.8);
+}
+
+
+/* ----------------------------------------------------------------
+   MOBILE MENU SLIDE ANIMATION
+   Uses max-height transition instead of height because CSS cannot
+   animate height: auto. The .open class is toggled by React.
+   ---------------------------------------------------------------- */
+#mobile-menu {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+}
+
+#mobile-menu.open {
+  max-height: 420px; /* large enough to never clip content */
+  opacity: 1;
+}
+
+
+/* ----------------------------------------------------------------
+   BUTTON — PRIMARY
+   Gradient fill pill button with a shimmer overlay on hover.
+   The ::after pseudo-element provides the shimmer — it starts
+   opacity:0 and fades in on hover.
+   ---------------------------------------------------------------- */
+.btn-primary {
+  background: linear-gradient(135deg, #6ee7f7, #a3e635);
+  color: #09090b;
+  font-weight: 700;
+  font-family: 'Syne', sans-serif;
+  letter-spacing: 0.02em;
+  border-radius: 9999px;       /* fully rounded / pill shape */
+  padding: 0.75rem 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;             /* clips the ::after shimmer */
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(110, 231, 247, 0.35);
+}
+
+.btn-primary:hover::after {
+  opacity: 1; /* show shimmer */
+}
+
+.btn-primary:active {
+  transform: translateY(0); /* snap back on click */
+}
+
+
+/* ----------------------------------------------------------------
+   BUTTON — GHOST
+   Outlined pill button. Border and text glow on hover.
+   ---------------------------------------------------------------- */
+.btn-ghost {
+  border: 1px solid rgba(110, 231, 247, 0.3);
+  color: #6ee7f7;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.75rem 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.btn-ghost:hover {
+  border-color: #6ee7f7;
+  background: rgba(110, 231, 247, 0.08);
+  transform: translateY(-2px);
+}
+
+
+/* ----------------------------------------------------------------
+   CARD
+   Dark surface with a subtle border. On hover the border glows
+   cyan and the card lifts slightly with translateY.
+   ---------------------------------------------------------------- */
+.card {
+  background: #111114;
+  border: 1px solid #2a2a32;
+  border-radius: 1rem;
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  border-color: rgba(110, 231, 247, 0.4);
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0   40px rgba(110, 231, 247, 0.06);
+}
+
+
+/* ----------------------------------------------------------------
+   TICKER / MARQUEE
+   The track div is wider than the viewport and animates with a
+   CSS keyframe. Hovering pauses the animation for readability.
+   ---------------------------------------------------------------- */
+.ticker-wrap {
+  overflow: hidden;
+}
+
+.ticker-track {
+  display: flex;
+  white-space: nowrap;
+  width: max-content;
+  animation: ticker 28s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Ticker keyframe — slides the track left by exactly 50% of its
+   width. Because the items are doubled, this creates a seamless
+   loop: when the first copy exits, the second copy is already
+   in position and looks identical. */
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+
+/* ----------------------------------------------------------------
+   FORM INPUTS
+   Consistent dark-surface inputs used in the contact form.
+   ---------------------------------------------------------------- */
+.form-input {
+  width: 100%;
+  background: #111114;
+  border: 1px solid #2a2a32;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  color: #f4f4f5;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none; /* we draw our own focus ring below */
+}
+
+.form-input:focus {
+  border-color: #6ee7f7;
+  /* soft glow ring that sits outside the border */
+  box-shadow: 0 0 0 3px rgba(110, 231, 247, 0.12);
+}
+
+.form-input::placeholder {
+  color: #52525b; /* muted placeholder text */
+}
+
+
+/* ----------------------------------------------------------------
+   FLOATING ORBS
+   Large, blurred colour blobs used as ambient light in sections.
+   position: absolute so they stay relative to their container.
+   filter: blur creates the soft glow effect.
+   pointer-events: none prevents them intercepting clicks.
+   ---------------------------------------------------------------- */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+
+/* ----------------------------------------------------------------
+   SECTION LABEL
+   The small uppercase pill labels above section headings,
+   e.g. "What We Do", "About Us", etc.
+   ---------------------------------------------------------------- */
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6ee7f7;
+  background: rgba(110, 231, 247, 0.08);
+  border: 1px solid rgba(110, 231, 247, 0.2);
+  border-radius: 9999px;
+  padding: 0.35rem 1rem;
+}
+
+
+/* ----------------------------------------------------------------
+   GRADIENT DIVIDER LINE
+   A 1px horizontal rule that fades from transparent → cyan glow
+   → transparent. Used between major sections.
+   ---------------------------------------------------------------- */
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(110, 231, 247, 0.3),
+    transparent
+  );
+  margin-left: 2rem;
+  margin-right: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .divider {
+    margin-left: 4rem;
+    margin-right: 4rem;
+  }
+}
+
+
+/* ----------------------------------------------------------------
+   STAT NUMBERS
+   Large bold counters in the Hero section.
+   Using Syne for display weight and consistency.
+   ---------------------------------------------------------------- */
+.stat-num {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+}
+
+
+/* ----------------------------------------------------------------
+   TESTIMONIAL CARD — stars
+   volt (#a3e635) star colour applied through a child selector.
+   ---------------------------------------------------------------- */
+.tcard .stars {
+  color: #a3e635;
+}
+
+
+/* ----------------------------------------------------------------
+   CUSTOM SCROLLBAR (Webkit browsers — Chrome, Edge, Safari)
+   Thin, dark scrollbar that matches the site palette.
+   Firefox uses scrollbar-color (set below).
+   ---------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a32;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6ee7f7;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a32 #09090b;
+}
+
+
+/* ----------------------------------------------------------------
+   SKILL / PROGRESS BARS (About section)
+   The bar fill uses a CSS transition so it animates to its
+   target width when the parent becomes visible on screen.
+   ---------------------------------------------------------------- */
+.skill-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #6ee7f7, #a3e635);
+  transition: width 1.2s ease;
+}
+
+
+/* ----------------------------------------------------------------
+   ICON WRAPPER
+   Consistent square container for SVG icons inside cards.
+   ---------------------------------------------------------------- */
+.icon-box {
+  width: 3rem;             /* 48px */
+  height: 3rem;
+  border-radius: 0.75rem;  /* slightly rounded square */
+  background: rgba(110, 231, 247, 0.08);
+  border: 1px solid rgba(110, 231, 247, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+
+/* ----------------------------------------------------------------
+   CONTACT INFO CARD
+   Small card rows in the contact section left column.
+   ---------------------------------------------------------------- */
+.contact-info-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  background: rgba(110, 231, 247, 0.08);
+  border: 1px solid rgba(110, 231, 247, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6ee7f7;
+}
