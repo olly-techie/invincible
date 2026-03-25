@@ -1601,28 +1601,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </form>
                      
 
-    <div class="form-message" id="formMessage"></div>  
-
-    <input type="text" name="website" class="honeypot" tabindex="-1" autocomplete="off">  
-
-    <div class="form-group">  
-        <label for="name">Your Name</label>  
-        <input type="text" id="name" name="name" required>  
-    </div>  
-
-    <div class="form-group">  
-        <label for="email">Email Address</label>  
-        <input type="email" id="email" name="email" required>  
-    </div>  
-
-    <div class="form-group">  
-        <label for="message">Tell Us About Your Project</label>  
-        <textarea id="message" name="message" required></textarea>  
-    </div>  
-
-    <button type="submit" class="btn btn-primary">Send Message</button>  
-
-</form>
 
 <script>
   document.getElementById('contactForm').addEventListener('submit', function(e) {
