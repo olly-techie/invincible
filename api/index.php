@@ -1570,7 +1570,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        - email    : required email
                        - message  : required textarea
                      ------------------------------------------ -->
-form class="contact-form" id="contactForm">  
+
 
     <div class="form-message" id="formMessage"></div>  
 
