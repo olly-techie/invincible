@@ -1570,47 +1570,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        - email    : required email
                        - message  : required textarea
                      ------------------------------------------ -->
-<form 
-    class="contact-form" 
-    action="mailto:ollyverse01@gmail.com,olamiposiayeriyina@gmail.com"
-    method="POST"
-    enctype="text/plain"
->
+form class="contact-form" id="contactForm">  
 
-    <!-- Feedback message area -->
-    <div class="form-message" id="formMessage"></div>
+    <div class="form-message" id="formMessage"></div>  
 
-    <!-- Honeypot -->
-    <input
-        type="text"
-        name="website"
-        class="honeypot"
-        tabindex="-1"
-        autocomplete="off"
-    >
+    <input type="text" name="website" class="honeypot" tabindex="-1" autocomplete="off">  
 
-    <!-- Name -->
-    <div class="form-group">
-        <label for="name">Your Name</label>
-        <input type="text" id="name" name="Name" required>
-    </div>
+    <div class="form-group">  
+        <label for="name">Your Name</label>  
+        <input type="text" id="name" name="name" required>  
+    </div>  
 
-    <!-- Email -->
-    <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="Email" required>
-    </div>
+    <div class="form-group">  
+        <label for="email">Email Address</label>  
+        <input type="email" id="email" name="email" required>  
+    </div>  
 
-    <!-- Message -->
-    <div class="form-group">
-        <label for="message">Tell Us About Your Project</label>
-        <textarea id="message" name="Message" required></textarea>
-    </div>
+    <div class="form-group">  
+        <label for="message">Tell Us About Your Project</label>  
+        <textarea id="message" name="message" required></textarea>  
+    </div>  
 
-    <!-- Submit -->
-    <button type="submit" class="btn btn-primary">Send Message</button>
+    <button type="submit" class="btn btn-primary">Send Message</button>  
 
 </form>
+
+<script>
+  document.getElementById('contactForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Honeypot check
+    if (this.querySelector('[name="website"]').value) return;
+
+    const name    = document.getElementById('name').value.trim();
+    const email   = document.getElementById('email').value.trim();
+    const message = document.getElementById('message').value.trim();
+    const msg     = document.getElementById('formMessage');
+
+    if (!name || !email || !message) {
+      msg.textContent = 'Please fill in all fields.';
+      msg.style.color = 'red';
+      return;
+    }
+
+    const to      = 'ollyverse01@gmail.com,olamiposiayeriyina@gmail.com';
+    const subject = encodeURIComponent(`Project Enquiry from ${name}`);
+    const body    = encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`);
+
+    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+
+    msg.textContent = 'Your email client should now open. Send the email to submit your message.';
+    msg.style.color = 'green';
+  });
+</script>
             </div>
         </section>
 
