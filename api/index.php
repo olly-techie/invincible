@@ -391,7 +391,7 @@
             return;
         }
         
-        const recipients = 'ollyphel@gmail.com,ollyverse01@gmail.com';
+        const recipients = 'ollyphel@gmail.com,olamiposiayeriyina@gmail.com';
         const subject = encodeURIComponent('New contact from Invincible Studio');
         const body = encodeURIComponent(
             `Name: ${name}\n` +
