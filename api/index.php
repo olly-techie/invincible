@@ -1558,19 +1558,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="contact-item location">Available Worldwide</div>
                 </div>
 
+<form 
+    class="contact-form" 
+    action="mailto:ollyverse01@gmail.com,olamiposiayeriyina@gmail.com"
+    method="POST"
+    enctype="text/plain"
+>
 
-                <!-- ------------------------------------------
-                     CONTACT FORM
-                     Submitted via AJAX (fetch API) in the JS below.
-                     The form posts to this same file (index.php).
+    <!-- Feedback message area -->
+    <div class="form-message" id="formMessage"></div>
+
+    <!-- Honeypot -->
+    <input
+        type="text"
+        name="website"
+        class="honeypot"
+        tabindex="-1"
+        autocomplete="off"
+    >
+
+    <!-- Name -->
+    <div class="form-group">
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="Name" required>
+    </div>
+
+    <!-- Email -->
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="Email" required>
+    </div>
+
+    <!-- Message -->
+    <div class="form-group">
+        <label for="message">Tell Us About Your Project</label>
+        <textarea id="message" name="Message" required></textarea>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" class="btn btn-primary">Send Message</button>
+
+</form>
                      
-                     Fields:
-                       - website  : honeypot (hidden from real users)
-                       - name     : required text
-                       - email    : required email
-                       - message  : required textarea
-                     ------------------------------------------ -->
-
 
     <div class="form-message" id="formMessage"></div>  
 
