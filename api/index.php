@@ -1570,42 +1570,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        - email    : required email
                        - message  : required textarea
                      ------------------------------------------ -->
-                <form class="contact-form" id="contactForm">
+<form 
+    class="contact-form" 
+    action="mailto:ollyverse01@gmail.com,olamiposiayeriyina@gmail.com"
+    method="POST"
+    enctype="text/plain"
+>
 
-                    <!-- Feedback message area (success / error) — hidden until JS reveals it -->
-                    <div class="form-message" id="formMessage"></div>
+    <!-- Feedback message area -->
+    <div class="form-message" id="formMessage"></div>
 
-                    <!-- HONEYPOT: hidden field — bots fill it, PHP rejects the submission -->
-                    <input
-                        type="text"
-                        name="website"
-                        class="honeypot"
-                        tabindex="-1"
-                        autocomplete="off"
-                    >
+    <!-- Honeypot -->
+    <input
+        type="text"
+        name="website"
+        class="honeypot"
+        tabindex="-1"
+        autocomplete="off"
+    >
 
-                    <!-- Name field -->
-                    <div class="form-group">
-                        <label for="name">Your Name</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
+    <!-- Name -->
+    <div class="form-group">
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="Name" required>
+    </div>
 
-                    <!-- Email field -->
-                    <div class="form-group">
-                        <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
+    <!-- Email -->
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="Email" required>
+    </div>
 
-                    <!-- Project description textarea -->
-                    <div class="form-group">
-                        <label for="message">Tell Us About Your Project</label>
-                        <textarea id="message" name="message" required></textarea>
-                    </div>
+    <!-- Message -->
+    <div class="form-group">
+        <label for="message">Tell Us About Your Project</label>
+        <textarea id="message" name="Message" required></textarea>
+    </div>
 
-                    <!-- Submit button — disabled during AJAX in-flight -->
-                    <button type="submit" class="btn btn-primary">Send Message</button>
+    <!-- Submit -->
+    <button type="submit" class="btn btn-primary">Send Message</button>
 
-                </form>
+</form>
             </div>
         </section>
 
