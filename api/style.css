@@ -1,26 +1,16 @@
-/* ============================================================
-   INVINCIBLE STUDIO — style.css
-   ============================================================ */
-
 /* ── FONT IMPORTS ─────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
-
-/* ── CSS CUSTOM PROPERTY FOR ANIMATED GRADIENT BORDERS ───── */
-/* @property allows CSS to animate custom properties (conic-gradient angle) */
 @property --border-angle {
     syntax: '<angle>';
     initial-value: 0deg;
     inherits: false;
 }
-
-/* ── GLOBAL RESET ─────────────────────────────────────────── */
 *, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* ── DESIGN TOKENS ────────────────────────────────────────── */
 :root {
     --orange:          #FFA500;
     --orange-dim:      rgba(255, 165, 0, 0.15);
@@ -39,7 +29,6 @@
     --transition:      0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* ── BASE ─────────────────────────────────────────────────── */
 html {
     scroll-behavior: smooth;
     font-size: 16px;
@@ -51,13 +40,11 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
-    /* Subtle noise grain texture overlay */
     background-image:
         radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,165,0,0.07), transparent),
         url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
 }
 
-/* ── LAYOUT ───────────────────────────────────────────────── */
 .container {
     max-width: 1200px;
     margin: 0 auto;
