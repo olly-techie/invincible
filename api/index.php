@@ -1,49 +1,112 @@
 <?php
 /**
  * ============================================================
- * INVINCIBLE STUDIO — index.php
+ * INVINCIBLE STUDIO — Single-File Landing Page
  * ============================================================
- * POST  → JSON API: validates & saves contact form submissions
- * GET   → Renders the full landing page HTML
+ *
+ * This file serves a dual purpose:
+ *   1. Acts as a PHP backend that handles contact form submissions
+ *      via POST requests, validates input, and appends messages
+ *      to a local `messages.json` file.
+ *   2. Renders the full HTML landing page (on GET requests).
+ *
+ * Structure:
+ *   - PHP Backend (top of file, runs before any HTML output)
+ *   - HTML Document (DOCTYPE → <html> → <head> → <body>)
+ *     - <head>: Meta tags, SEO, Open Graph, Schema.org JSON-LD, CSS styles
+ *     - <body>: Header/Nav, Hero, Services, Work, About, Testimonials,
+ *               Contact/CTA, Footer
+ *     - <script>: Mobile nav toggle, scroll animations, form AJAX submission
  * ============================================================
  */
 
-/* ── POST HANDLER ─────────────────────────────────────────── */
+
+/* ============================================================
+ * SECTION 1: PHP FORM HANDLER
+ * ============================================================
+ * This block only executes when the page receives a POST request
+ * (i.e., when the contact form is submitted via AJAX).
+ * It validates input, then writes the data to messages.json.
+ * After echoing a JSON response, it exits immediately so no
+ * HTML is rendered for POST requests.
+ * ============================================================ */
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+    // All responses from this handler are JSON
     header('Content-Type: application/json');
 
     /**
-     * Sanitise a raw input string:
-     * trim whitespace, encode HTML entities (XSS prevention).
+     * Sanitise a single string value from user input.
+     * - trim()             → removes leading/trailing whitespace
+     * - htmlspecialchars() → converts special chars to HTML entities
+     *                        (prevents XSS if data is ever rendered)
+     * - ENT_QUOTES         → encodes both single and double quotes
+     * - 'UTF-8'            → explicit charset to avoid encoding edge cases
+     *
+     * @param  string $data  Raw input value
+     * @return string        Sanitised value
      */
-    function clean(string $data): string {
+    function clean($data) {
         return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
     }
 
-    /* Honeypot check — bots fill hidden fields, humans don't */
+    /* ----------------------------------------------------------
+     * HONEYPOT SPAM CHECK
+     * A hidden "website" field is in the HTML form but is visually
+     * hidden from real users (positioned off-screen, tab-index -1).
+     * Bots that blindly fill every field will populate it.
+     * If it's non-empty, we silently reject the submission.
+     * ---------------------------------------------------------- */
     if (!empty($_POST['website'])) {
-        echo json_encode(['status' => 'error', 'message' => 'Spam detected']);
+        echo json_encode([
+            'status'  => 'error',
+            'message' => 'Spam detected'
+        ]);
         exit;
     }
 
+    /* ----------------------------------------------------------
+     * COLLECT & SANITISE FORM FIELDS
+     * The null-coalescing operator (??) returns an empty string
+     * if the key doesn't exist in $_POST, preventing notices.
+     * ---------------------------------------------------------- */
     $name    = clean($_POST['name']    ?? '');
     $email   = clean($_POST['email']   ?? '');
     $message = clean($_POST['message'] ?? '');
 
-    /* Required fields */
+    /* ----------------------------------------------------------
+     * REQUIRED FIELDS VALIDATION
+     * All three fields must be non-empty strings after cleaning.
+     * ---------------------------------------------------------- */
     if (!$name || !$email || !$message) {
-        echo json_encode(['status' => 'error', 'message' => 'All fields required']);
+        echo json_encode([
+            'status'  => 'error',
+            'message' => 'All fields required'
+        ]);
         exit;
     }
 
-    /* Email format validation */
+    /* ----------------------------------------------------------
+     * EMAIL FORMAT VALIDATION
+     * PHP's built-in FILTER_VALIDATE_EMAIL checks RFC-compliant
+     * email format — returns false if invalid.
+     * ---------------------------------------------------------- */
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        echo json_encode(['status' => 'error', 'message' => 'Invalid email address']);
+        echo json_encode([
+            'status'  => 'error',
+            'message' => 'Invalid email'
+        ]);
         exit;
     }
 
-    /* Build entry & append to messages.json (NDJSON / newline-delimited) */
+    /* ----------------------------------------------------------
+     * BUILD THE MESSAGE ENTRY
+     * Captures the submitter's IP for basic logging/audit purposes.
+     * REMOTE_ADDR may be missing in some server configs (e.g. CLI),
+     * so we fall back to 'unknown'.
+     * date('c') produces an ISO 8601 timestamp (e.g. 2024-06-01T12:30:00+00:00).
+     * ---------------------------------------------------------- */
     $entry = [
         'name'      => $name,
         'email'     => $email,
@@ -52,50 +115,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'timestamp' => date('c')
     ];
 
-    $saved = file_put_contents(
-        __DIR__ . '/messages.json',
+    /* ----------------------------------------------------------
+     * PERSIST TO messages.json
+     * file_put_contents() with FILE_APPEND adds a new JSON line
+     * each time (newline-delimited JSON / NDJSON format).
+     * LOCK_EX acquires an exclusive lock to prevent race conditions
+     * when multiple users submit simultaneously.
+     * Returns the number of bytes written on success, or false on failure.
+     * ---------------------------------------------------------- */
+    $success = file_put_contents(
+        'messages.json',
         json_encode($entry) . PHP_EOL,
         FILE_APPEND | LOCK_EX
     );
 
+    /* ----------------------------------------------------------
+     * RESPOND WITH SUCCESS OR FAILURE
+     * Ternary: if $success is not false → send success response,
+     * otherwise send a generic error message.
+     * ---------------------------------------------------------- */
     echo json_encode(
-        $saved !== false
-            ? ['status' => 'success', 'message' => 'Message sent! We\'ll be in touch soon.']
-            : ['status' => 'error',   'message' => 'Could not save. Please try again.']
+        $success !== false
+            ? ['status' => 'success', 'message' => 'Message sent successfully!']
+            : ['status' => 'error',   'message' => 'Failed to save. Try again.']
     );
+
+    // Stop execution — do not render any HTML for POST requests
     exit;
 }
+
 ?><!DOCTYPE html>
+<!--
+    ============================================================
+    HTML DOCUMENT
+    The PHP block above has already exited if this was a POST
+    request. Everything below is only rendered for GET requests.
+    ============================================================
+-->
 <html lang="en">
+
 <head>
+    <!-- ========================================================
+         META & SEO
+         ======================================================== -->
+
+    <!-- Character encoding — always declare first -->
     <meta charset="UTF-8">
+
+    <!-- Responsive viewport: width follows device, 1:1 initial scale -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- Primary page title (shown in browser tab & search results) -->
     <title>INVINCIBLE — Design, Development &amp; AI Studio | Premium Digital Solutions</title>
 
+    <!-- Meta description — used as the snippet in search engine results -->
     <meta name="description" content="We build brands that are truly invincible. From stunning visuals to powerful digital products, we transform your vision into experiences that captivate, convert, and endure.">
-    <meta name="keywords"    content="web design, web development, AI solutions, graphics design, motion design, UI/UX design, app development, digital agency, branding">
-    <meta name="author"      content="Invincible Studio">
-    <meta name="robots"      content="index, follow">
 
-    <!-- Open Graph -->
+    <!-- Keywords — less influential for modern SEO but still included -->
+    <meta name="keywords" content="web design, web development, AI solutions, graphics design, motion design, UI/UX design, app development, digital agency, branding">
+
+    <!-- Author attribution -->
+    <meta name="author" content="Invincible Studio">
+
+    <!-- Tell search bots to index this page and follow its links -->
+    <meta name="robots" content="index, follow">
+
+
+    <!-- ========================================================
+         OPEN GRAPH (OG) TAGS
+         Controls how the page looks when shared on Facebook,
+         LinkedIn, WhatsApp, and other OG-compatible platforms.
+         ======================================================== -->
     <meta property="og:type"        content="website">
     <meta property="og:url"         content="https://yourdomain.com/">
     <meta property="og:title"       content="INVINCIBLE — Design, Development &amp; AI Studio">
-    <meta property="og:description" content="We build brands that are truly invincible.">
+    <meta property="og:description" content="We build brands that are truly invincible. Transform your vision into digital excellence.">
+    <!-- og:image should be at least 1200×630px for best display -->
     <meta property="og:image"       content="https://yourdomain.com/og-image.jpg">
 
-    <!-- Twitter Card -->
+
+    <!-- ========================================================
+         TWITTER CARD TAGS
+         Controls how the page looks when shared on Twitter/X.
+         summary_large_image = big banner-style card.
+         ======================================================== -->
     <meta property="twitter:card"        content="summary_large_image">
     <meta property="twitter:url"         content="https://yourdomain.com/">
     <meta property="twitter:title"       content="INVINCIBLE — Design, Development &amp; AI Studio">
-    <meta property="twitter:description" content="We build brands that are truly invincible.">
+    <meta property="twitter:description" content="We build brands that are truly invincible. Transform your vision into digital excellence.">
     <meta property="twitter:image"       content="https://yourdomain.com/og-image.jpg">
 
-    <!-- SVG Favicon (no extra file needed) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23FFA500'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='sans-serif' font-weight='900' fill='%23000'>I</text></svg>">
 
-    <!-- Schema.org JSON-LD -->
+    <!-- ========================================================
+         FAVICON
+         Inline SVG favicon using a data URI — no separate file needed.
+         The fire emoji renders as the tab icon in modern browsers.
+         ======================================================== -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+
+
+    <!-- ========================================================
+         SCHEMA.ORG STRUCTURED DATA (JSON-LD)
+         Helps search engines understand the entity behind this page.
+         Google uses this to potentially show rich results.
+         @type: Organization — the most appropriate type for a studio.
+         ======================================================== -->
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -112,900 +236,1389 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     </script>
 
-    <!-- Stylesheet -->
+
+    <!-- ========================================================
+         STYLES
+         All CSS is inlined for single-file portability.
+         Sections are clearly labelled below.
+         ======================================================== -->
     <style>
-      /* ── FONT IMPORTS ─────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
-@property --border-angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
-}
-*, *::before, *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-:root {
-    --orange:          #FFA500;
-    --orange-dim:      rgba(255, 165, 0, 0.15);
-    --orange-glow:     rgba(255, 165, 0, 0.35);
-    --orange-border:   rgba(255, 165, 0, 0.08);
-    --dark-bg:         #080808;
-    --card-bg:         #111111;
-    --card-bg-alt:     #161616;
-    --text-primary:    #f5f5f5;
-    --text-secondary:  #888;
-    --border:          #222;
-    --border-subtle:   #1a1a1a;
-    --font-display:    'Syne', sans-serif;
-    --font-body:       'DM Sans', sans-serif;
-    --radius:          14px;
-    --transition:      0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-html {
-    scroll-behavior: smooth;
-    font-size: 16px;
-}
-
-body {
-    font-family: var(--font-body);
-    background: var(--dark-bg);
-    color: var(--text-primary);
-    line-height: 1.6;
-    overflow-x: hidden;
-    background-image:
-        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,165,0,0.07), transparent),
-        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 2rem;
-}
-
-/* ── KEYFRAMES ────────────────────────────────────────────── */
-
-/* Rotating gradient border for cards */
-@keyframes border-spin {
-    to { --border-angle: 360deg; }
-}
-
-/* Ambient pulse glow for icon containers */
-@keyframes icon-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); }
-    50%       { box-shadow: 0 0 20px 4px rgba(255, 165, 0, 0.15); }
-}
-
-/* Floating orbs in hero */
-@keyframes float-orb {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50%       { transform: translateY(-30px) scale(1.05); }
-}
-
-/* Marquee strip ticker */
-@keyframes marquee {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
-}
-
-/* Subtle shimmer on footer logo */
-@keyframes shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position:  200% center; }
-}
-
-/* ── HEADER ───────────────────────────────────────────────── */
-header {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 1000;
-    /* Initially hidden — GSAP slides it in on load */
-    background: rgba(8, 8, 8, 0.85);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.logo {
-    font-family: var(--font-display);
-    font-size: 1.15rem;
-    font-weight: 800;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--text-primary);
-    text-decoration: none;
-}
-
-/* Animated underline dot on logo */
-.logo span {
-    color: var(--orange);
-}
-
-.nav-links {
-    display: flex;
-    gap: 2.5rem;
-    list-style: none;
-    align-items: center;
-}
-
-.nav-links a {
-    text-decoration: none;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    transition: color var(--transition);
-    position: relative;
-}
-
-.nav-links a::after {
-    content: '';
-    position: absolute;
-    bottom: -3px; left: 0;
-    width: 0; height: 1px;
-    background: var(--orange);
-    transition: width var(--transition);
-}
-
-.nav-links a:hover {
-    color: var(--text-primary);
-}
-
-.nav-links a:hover::after {
-    width: 100%;
-}
-
-/* Nav CTA button */
-.btn-cta {
-    background: var(--orange);
-    color: #000;
-    padding: 0.6rem 1.4rem;
-    border-radius: 50px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    text-decoration: none;
-    letter-spacing: 0.3px;
-    transition: all var(--transition);
-    border: 1px solid var(--orange);
-}
-
-.btn-cta:hover {
-    background: transparent;
-    color: var(--orange);
-    box-shadow: 0 0 20px rgba(255, 165, 0, 0.3);
-}
-
-/* Remove underline override for CTA */
-.btn-cta::after { display: none; }
-
-/* Mobile hamburger — hidden on desktop */
-.mobile-toggle {
-    display: none;
-    flex-direction: column;
-    gap: 5px;
-    cursor: pointer;
-    padding: 4px;
-}
-
-.mobile-toggle span {
-    width: 22px; height: 1.5px;
-    background: var(--text-primary);
-    border-radius: 2px;
-    transition: all 0.3s ease;
-    display: block;
-}
-
-/* Animate hamburger → X when active */
-.mobile-toggle.active span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-.mobile-toggle.active span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.mobile-toggle.active span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
-
-/* ── HERO ─────────────────────────────────────────────────── */
-.hero {
-    padding: 13rem 0 8rem;
-    position: relative;
-    overflow: hidden;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-}
-
-/* Decorative floating orbs — actual divs so GSAP can target them */
-.hero-orb {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    filter: blur(80px);
-    will-change: transform;
-}
-
-.hero-orb-1 {
-    width: 600px; height: 600px;
-    top: -20%; left: -15%;
-    background: radial-gradient(circle, rgba(255,165,0,0.07) 0%, transparent 70%);
-    animation: float-orb 12s ease-in-out infinite;
-}
-
-.hero-orb-2 {
-    width: 500px; height: 500px;
-    bottom: -15%; right: -10%;
-    background: radial-gradient(circle, rgba(255,165,0,0.05) 0%, transparent 70%);
-    animation: float-orb 16s ease-in-out infinite reverse;
-}
-
-.hero-content {
-    text-align: center;
-    position: relative;
-    z-index: 1;
-    width: 100%;
-}
-
-/* Badge pill */
-.hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 165, 0, 0.08);
-    border: 1px solid rgba(255, 165, 0, 0.2);
-    padding: 0.5rem 1.1rem;
-    border-radius: 50px;
-    font-size: 0.82rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    margin-bottom: 2.5rem;
-    color: var(--orange);
-}
-
-.hero-badge .badge-icon {
-    width: 14px; height: 14px;
-    color: var(--orange);
-}
-
-/* Headline line masking for GSAP wipe-up animation */
-.hero-title {
-    font-family: var(--font-display);
-    font-size: clamp(3rem, 7vw, 5.5rem);
-    font-weight: 800;
-    line-height: 1.08;
-    margin-bottom: 2rem;
-    letter-spacing: -0.03em;
-}
-
-/* Each line wrapped to mask the GSAP slide-up */
-.line-wrap {
-    display: block;
-    overflow: hidden;
-    padding-bottom: 0.1em; /* Prevents descenders from clipping */
-}
-
-.line-inner {
-    display: block;
-}
-
-.highlight { color: var(--orange); }
-
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-    max-width: 620px;
-    margin: 0 auto 3rem;
-    line-height: 1.8;
-    font-weight: 300;
-}
-
-/* CTA button row */
-.hero-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-bottom: 6rem;
-}
-
-/* ── BUTTONS ──────────────────────────────────────────────── */
-.btn {
-    padding: 0.95rem 2.2rem;
-    border-radius: 50px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all var(--transition);
-    font-size: 0.95rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid transparent;
-    cursor: pointer;
-    font-family: var(--font-body);
-    letter-spacing: 0.2px;
-}
-
-.btn-primary {
-    background: var(--orange);
-    color: #000;
-    border-color: var(--orange);
-}
-
-.btn-primary:hover {
-    background: transparent;
-    color: var(--orange);
-    box-shadow: 0 0 30px rgba(255, 165, 0, 0.25), inset 0 0 0 1px var(--orange);
-    transform: translateY(-2px);
-}
-
-.btn-secondary {
-    background: transparent;
-    color: var(--text-primary);
-    border-color: var(--border);
-}
-
-.btn-secondary:hover {
-    border-color: rgba(255, 165, 0, 0.4);
-    color: var(--orange);
-    transform: translateY(-2px);
-}
-
-/* ── HERO STATS ───────────────────────────────────────────── */
-.hero-stats {
-    display: flex;
-    gap: 5rem;
-    justify-content: center;
-    padding-top: 4rem;
-    border-top: 1px solid var(--border-subtle);
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.stat { text-align: center; }
-
-.stat-number {
-    font-family: var(--font-display);
-    font-size: 2.8rem;
-    font-weight: 800;
-    color: var(--orange);
-    display: block;
-    line-height: 1;
-}
-
-.stat-label {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    margin-top: 0.5rem;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    font-weight: 400;
-}
-
-/* ── MARQUEE TICKER STRIP ─────────────────────────────────── */
-.marquee-strip {
-    overflow: hidden;
-    border-top: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 1rem 0;
-    background: var(--card-bg);
-    white-space: nowrap;
-}
-
-.marquee-track {
-    display: inline-flex;
-    gap: 0;
-    animation: marquee 25s linear infinite;
-    /* Duplicate content fills the loop gap */
-}
-
-.marquee-item {
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    padding: 0 2.5rem;
-}
-
-.marquee-item.dot {
-    color: var(--orange);
-    padding: 0;
-}
-
-/* ── SECTION HEADER ───────────────────────────────────────── */
-.section-header {
-    text-align: center;
-    margin-bottom: 4rem;
-}
-
-.section-label {
-    display: inline-block;
-    color: var(--orange);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    margin-bottom: 1.2rem;
-    padding: 0.35rem 1rem;
-    border: 1px solid rgba(255,165,0,0.2);
-    border-radius: 50px;
-    background: rgba(255,165,0,0.05);
-}
-
-.section-header h2 {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 3.2rem);
-    font-weight: 800;
-    line-height: 1.15;
-    margin-bottom: 1.2rem;
-    letter-spacing: -0.02em;
-}
-
-.section-header p {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    max-width: 580px;
-    margin: 0 auto;
-    font-weight: 300;
-    line-height: 1.8;
-}
-
-/* ── GLOWING CARD BORDER MIXIN ────────────────────────────── */
-/*
-   The rotating gradient border technique:
-   - border: 1.5px solid transparent  (makes space for the gradient)
-   - background: card-color as padding-box, conic-gradient as border-box
-   - The conic-gradient rotates via --border-angle custom property
-   - @property enables CSS to animate this value
-*/
-.glow-card {
-    position: relative;
-    border: 1.5px solid transparent;
-    border-radius: var(--radius);
-    background:
-        linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-        conic-gradient(
-            from var(--border-angle),
-            rgba(255, 165, 0, 0.06) 0deg,
-            rgba(255, 165, 0, 0.06) 200deg,
-            rgba(255, 165, 0, 0.55) 240deg,
-            rgba(255, 210, 80, 0.85) 260deg,
-            rgba(255, 165, 0, 0.55) 280deg,
-            rgba(255, 165, 0, 0.06) 320deg,
-            rgba(255, 165, 0, 0.06) 360deg
-        ) border-box;
-    animation: border-spin 7s linear infinite;
-    transition: box-shadow var(--transition), transform var(--transition), animation-duration 0.1s;
-}
-
-.glow-card:hover {
-    animation-duration: 2.5s; /* Speeds up on hover */
-    box-shadow:
-        0 0 30px rgba(255, 165, 0, 0.08),
-        0 20px 60px rgba(0,0,0,0.5),
-        inset 0 1px 0 rgba(255,255,255,0.04);
-    transform: translateY(-6px);
-    background:
-        linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
-        conic-gradient(
-            from var(--border-angle),
-            rgba(255, 165, 0, 0.15) 0deg,
-            rgba(255, 165, 0, 0.15) 200deg,
-            rgba(255, 165, 0, 0.9) 240deg,
-            rgba(255, 220, 80, 1) 260deg,
-            rgba(255, 165, 0, 0.9) 280deg,
-            rgba(255, 165, 0, 0.15) 320deg,
-            rgba(255, 165, 0, 0.15) 360deg
-        ) border-box;
-}
-
-/* ── SERVICES / FEATURES SECTION ──────────────────────────── */
-.features {
-    padding: 7rem 0;
-}
-
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
-}
-
-.feature-card {
-    padding: 2.25rem;
-    /* glow-card provides border + bg */
-    opacity: 0; /* GSAP animates this in */
-    transform: translateY(30px);
-}
-
-/* Lucide icon container */
-.feature-icon {
-    width: 46px; height: 46px;
-    background: var(--orange-dim);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-    color: var(--orange);
-    animation: icon-pulse 4s ease-in-out infinite;
-}
-
-.feature-icon svg {
-    width: 20px; height: 20px;
-    stroke-width: 1.75;
-}
-
-.feature-card h3 {
-    font-family: var(--font-display);
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin-bottom: 0.7rem;
-    letter-spacing: -0.01em;
-}
-
-.feature-card p {
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.7;
-    font-weight: 300;
-}
-
-/* ── PROJECTS SECTION ─────────────────────────────────────── */
-.projects {
-    padding: 7rem 0;
-}
-
-.projects-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
-}
-
-.project-card {
-    overflow: hidden;
-    opacity: 0;
-    transform: translateY(30px);
-}
-
-/* Image placeholder area */
-.project-image {
-    height: 220px;
-    background: linear-gradient(135deg, #1a1000 0%, #0f0c00 50%, #080808 100%);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Subtle shimmer overlay on project image */
-.project-image::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, transparent 40%, rgba(255,165,0,0.04) 60%, transparent 80%);
-}
-
-/* Arrow link icon in top-right corner */
-.project-icon {
-    position: absolute;
-    top: 1rem; right: 1rem;
-    width: 36px; height: 36px;
-    background: rgba(255, 165, 0, 0.1);
-    border: 1px solid rgba(255, 165, 0, 0.25);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--orange);
-    transition: all var(--transition);
-    z-index: 1;
-}
-
-.project-icon svg {
-    width: 15px; height: 15px;
-    stroke-width: 2;
-}
-
-.project-card:hover .project-icon {
-    background: var(--orange);
-    color: #000;
-    transform: rotate(45deg);
-}
-
-.project-info {
-    padding: 1.75rem;
-}
-
-.project-tags {
-    font-size: 0.7rem;
-    color: var(--orange);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 0.6rem;
-    font-weight: 600;
-}
-
-.project-info h3 {
-    font-family: var(--font-display);
-    font-size: 1.3rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    letter-spacing: -0.01em;
-}
-
-.project-info p {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.65;
-    font-weight: 300;
-}
-
-/* ── ABOUT / VALUES SECTION ───────────────────────────────── */
-.about {
-    padding: 7rem 0;
-    position: relative;
-}
-
-/* Decorative vertical line */
-.about::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 5%;
-    height: 90%;
-    width: 1px;
-    background: linear-gradient(to bottom, transparent, var(--border), transparent);
-    transform: translateX(-50%);
-    pointer-events: none;
-}
-
-.about-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
-    margin-top: 3.5rem;
-}
-
-.value-card {
-    padding: 2rem;
-    opacity: 0;
-    transform: translateY(30px);
-}
-
-.value-icon {
-    width: 44px; height: 44px;
-    background: var(--orange-dim);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.25rem;
-    color: var(--orange);
-}
-
-.value-icon svg {
-    width: 20px; height: 20px;
-    stroke-width: 1.75;
-}
-
-.value-card h3 {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-}
-
-.value-card p {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    line-height: 1.7;
-    font-weight: 300;
-}
-
-/* ── TESTIMONIALS ─────────────────────────────────────────── */
-.testimonials {
-    padding: 7rem 0;
-}
-
-.testimonials-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.25rem;
-}
-
-.testimonial {
-    padding: 2rem;
-    opacity: 0;
-    transform: translateY(30px);
-}
-
-.stars {
-    display: flex;
-    gap: 3px;
-    margin-bottom: 1.25rem;
-    color: var(--orange);
-}
-
-.stars svg {
-    width: 15px; height: 15px;
-    fill: var(--orange);
-    stroke: none;
-}
-
-.testimonial-content {
-    font-size: 0.92rem;
-    line-height: 1.8;
-    margin-bottom: 1.5rem;
-    color: var(--text-secondary);
-    font-style: italic;
-    font-weight: 300;
-}
-
-.testimonial-author h4 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    margin-bottom: 0.2rem;
-    letter-spacing: -0.01em;
-}
-
-.testimonial-author p {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-}
-
-/* ── CTA SECTION ──────────────────────────────────────────── */
-.cta {
-    padding: 8rem 0;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-
-/* Big background text decoration */
-.cta::before {
-    content: 'INVINCIBLE';
-    position: absolute;
-    font-family: var(--font-display);
-    font-size: clamp(5rem, 14vw, 14rem);
-    font-weight: 800;
-    color: transparent;
-    -webkit-text-stroke: 1px rgba(255,165,0,0.04);
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    white-space: nowrap;
-    pointer-events: none;
-    letter-spacing: -0.02em;
-}
-
-.cta h2 {
-    font-family: var(--font-display);
-    font-size: clamp(2.5rem, 5vw, 4rem);
-    font-weight: 800;
-    line-height: 1.1;
-    margin-bottom: 1.5rem;
-    letter-spacing: -0.03em;
-    position: relative;
-}
-
-.cta p {
-    font-size: 1.05rem;
-    color: var(--text-secondary);
-    max-width: 620px;
-    margin: 0 auto 3rem;
-    line-height: 1.8;
-    font-weight: 300;
-    position: relative;
-}
-
-.contact-info {
-    display: flex;
-    gap: 2.5rem;
-    justify-content: center;
-    margin-top: 3rem;
-    font-size: 0.9rem;
-    position: relative;
-}
-
-.contact-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-secondary);
-    transition: color var(--transition);
-}
-
-.contact-item:hover { color: var(--text-primary); }
-
-.contact-item svg {
-    width: 16px; height: 16px;
-    color: var(--orange);
-    flex-shrink: 0;
-    stroke-width: 1.75;
-}
-
-/* ── CONTACT FORM ─────────────────────────────────────────── */
-.contact-form {
-    max-width: 560px;
-    margin: 4rem auto 0;
-    position: relative;
-}
-
-.form-group { margin-bottom: 1.5rem; }
-
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-}
-
-input, textarea {
-    width: 100%;
-    padding: 0.95rem 1.25rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    font-family: var(--font-body);
-    transition: all var(--transition);
-}
-
-input:focus, textarea:focus {
-    outline: none;
-    border-color: rgba(255, 165, 0, 0.5);
-    background: var(--card-bg-alt);
-    box-shadow: 0 0 0 4px rgba(255, 165, 0, 0.06);
-}
-
-textarea {
-    resize: vertical;
-    min-height: 140px;
-    line-height: 1.6;
-}
-
-/* Honeypot — off-screen, never shown to real users */
-.honeypot {
-    position: absolute;
-    left: -9999px;
-    opacity: 0;
-    pointer-events: none;
-}
-/* Form feedback message */
-.form-message {
-    padding: 0.9rem 1.2rem;
-    border-radius: 10px;
-    margin-bottom: 1.5rem;
-    display: none;
-    font-size: 0.9rem;
-    font-weight: 500;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.form-message.success {
-    background: rgba(34, 197, 94, 0.08);
-    color: #4ade80;
-    border: 1px solid rgba(34, 197, 94, 0.2);
-}
-
-.form-message.error {
-    background: rgba(239, 68, 68, 0.08);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.form-message.show { display: flex; }
-
-/* ── FOOTER ───────────────────────────────────────────────── */
+
+        /* --------------------------------------------------------
+         * FONT IMPORT
+         * Loading Inter from Google Fonts — a clean, versatile
+         * sans-serif used extensively in modern UI design.
+         * Weights: 300 (light) through 900 (black).
+         * -------------------------------------------------------- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+
+        /* --------------------------------------------------------
+         * GLOBAL RESET
+         * Remove default browser margins/padding and use
+         * border-box sizing so padding doesn't expand element width.
+         * -------------------------------------------------------- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+
+        /* --------------------------------------------------------
+         * CSS CUSTOM PROPERTIES (DESIGN TOKENS)
+         * Centralised colour/value definitions on :root so they
+         * can be reused throughout and changed in one place.
+         * -------------------------------------------------------- */
+        :root {
+            --orange:         #FFA500;  /* Primary brand accent colour */
+            --dark-bg:        #0a0a0a;  /* Page background — near black */
+            --card-bg:        #1a1a1a;  /* Card/panel background */
+            --text-primary:   #fff;     /* Main body text */
+            --text-secondary: #999;     /* Muted/secondary text */
+            --border:         #2a2a2a;  /* Subtle border colour */
+        }
+
+
+        /* --------------------------------------------------------
+         * BASE DOCUMENT STYLES
+         * -------------------------------------------------------- */
+
+        /* Smooth anchor scroll for in-page links (#section) */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+        }
+
+
+        /* --------------------------------------------------------
+         * LAYOUT CONTAINER
+         * Constrains content to 1200px max-width and adds
+         * horizontal padding so content doesn't hug the edges
+         * on smaller screens.
+         * -------------------------------------------------------- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+
+        /* --------------------------------------------------------
+         * HEADER & NAVIGATION
+         * Fixed to the top of the viewport with a blur backdrop
+         * so content is visible beneath it as the user scrolls.
+         * -------------------------------------------------------- */
+        header {
+            position: fixed;         /* Stays at top while scrolling */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;           /* Above all page content */
+            background: rgba(10, 10, 10, 0.95); /* Near-opaque dark bg */
+            backdrop-filter: blur(10px);         /* Frosted-glass effect */
+            border-bottom: 1px solid var(--border);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Studio wordmark / logo text */
+        .logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Desktop navigation link list */
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        /* "Start a Project" CTA button in the nav */
+        .btn-cta {
+            background: var(--orange);
+            color: var(--dark-bg);
+            padding: 0.65rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+        }
+
+        /* Hamburger menu icon — hidden on desktop, shown on mobile */
+        .mobile-toggle {
+            display: none;            /* Hidden by default */
+            flex-direction: column;
+            gap: 0.35rem;
+            cursor: pointer;
+        }
+
+        /* Each bar of the hamburger icon */
+        .mobile-toggle span {
+            width: 24px;
+            height: 2px;
+            background: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+
+        /* --------------------------------------------------------
+         * HERO SECTION
+         * Full-width introductory section with headline, sub-copy,
+         * CTA buttons, and stat counters.
+         * Uses pseudo-elements (::before / ::after) for decorative
+         * radial gradient glows in the background.
+         * -------------------------------------------------------- */
+        .hero {
+            padding: 12rem 0 8rem; /* Large top padding clears fixed header */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Top-left decorative orange glow */
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -20%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(255, 165, 0, 0.08) 0%, transparent 70%);
+            pointer-events: none; /* Does not block mouse events */
+        }
+
+        /* Bottom-right decorative orange glow */
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            right: -10%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(255, 165, 0, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Small pill-shaped badge above the headline */
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            margin-bottom: 2rem;
+            color: var(--orange);
+        }
+
+        /* Lightning bolt icon prepended to the badge via CSS */
+        .hero-badge::before {
+            content: '⚡';
+            font-size: 1rem;
+        }
+
+        /* Centre-aligned hero content, layered above the pseudo-elements */
+        .hero-content {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Main headline */
+        .hero h1 {
+            font-size: 4.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em; /* Tight tracking for large display type */
+        }
+
+        /* Orange accent on keywords inside the headline */
+        .hero h1 .highlight {
+            color: var(--orange);
+        }
+
+        /* Subtitle / sub-headline paragraph */
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 3rem;
+            line-height: 1.7;
+        }
+
+        /* Container for the two CTA buttons */
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 5rem;
+        }
+
+
+        /* --------------------------------------------------------
+         * GENERIC BUTTON STYLES
+         * .btn is the base; .btn-primary and .btn-secondary are variants.
+         * -------------------------------------------------------- */
+        .btn {
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* Filled orange button */
+        .btn-primary {
+            background: var(--orange);
+            color: var(--dark-bg);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 165, 0, 0.3);
+        }
+
+        /* Ghost / outline button */
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-primary);
+        }
+
+
+        /* --------------------------------------------------------
+         * HERO STATISTICS ROW
+         * Three KPIs displayed horizontally below the CTA buttons.
+         * -------------------------------------------------------- */
+        .hero-stats {
+            display: flex;
+            gap: 4rem;
+            justify-content: center;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        /* Large numeric value */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--orange);
+            display: block;
+        }
+
+        /* Descriptive label below the number */
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+
+        /* --------------------------------------------------------
+         * REUSABLE SECTION HEADER
+         * Used in every major section — centres a label, heading,
+         * and optional description paragraph.
+         * -------------------------------------------------------- */
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        /* Small all-caps orange eyebrow label */
+        .section-label {
+            color: var(--orange);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 1rem;
+        }
+
+        .section-header h2 {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .section-header h2 .highlight {
+            color: var(--orange);
+        }
+
+        .section-header p {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 650px;
+            margin: 0 auto;
+        }
+
+
+        /* --------------------------------------------------------
+         * SERVICES / FEATURES SECTION
+         * 2-column card grid listing what the studio offers.
+         * Cards animate in via IntersectionObserver (JS below).
+         * -------------------------------------------------------- */
+        .features {
+            padding: 6rem 0;
+        }
+
+        /* Responsive 2-column grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        /* Individual service card — starts invisible, animates in */
+        .feature-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 2.5rem;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            /* Initial state: invisible + shifted down (for scroll animation) */
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        /* JS adds .visible once card enters the viewport */
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            border-color: rgba(255, 165, 0, 0.3);
+            transform: translateY(-5px); /* Subtle lift on hover */
+        }
+
+        /* Icon container — a small square with an orange tint border */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--orange);
+        }
+
+        .feature-card h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+
+        /* --------------------------------------------------------
+         * PORTFOLIO / PROJECTS SECTION
+         * 2-column grid of project cards with a 16:10 aspect ratio.
+         * -------------------------------------------------------- */
+        .projects {
+            padding: 6rem 0;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        /* Project card — same scroll animation pattern as feature cards */
+        .project-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            position: relative;
+            aspect-ratio: 16 / 10; /* Maintains consistent card proportions */
+        }
+
+        .project-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 165, 0, 0.3);
+        }
+
+        /* Placeholder image area (top 65% of the card) */
+        .project-image {
+            width: 100%;
+            height: 65%;
+            background: linear-gradient(135deg, #2a1a0f 0%, #1a1410 100%);
+            position: relative;
+        }
+
+        /* Small arrow icon in the top-right corner of the image area */
+        .project-icon {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--orange);
+            font-size: 1.2rem;
+        }
+
+        /* Bottom info panel of the project card */
+        .project-info {
+            padding: 1.5rem;
+        }
+
+        /* Service category tags */
+        .project-tags {
+            font-size: 0.75rem;
+            color: var(--orange);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .project-info h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-info p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+
+        /* --------------------------------------------------------
+         * ABOUT / VALUES SECTION
+         * Studio mission statement + 2-column values grid.
+         * -------------------------------------------------------- */
+        .about {
+            padding: 6rem 0;
+        }
+
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        /* Individual value card — same scroll-in animation */
+        .value-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            border-radius: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .value-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Icon box — same style as feature cards */
+        .value-icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 1.25rem;
+            color: var(--orange);
+        }
+
+        .value-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .value-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+
+        /* --------------------------------------------------------
+         * TESTIMONIALS SECTION
+         * 3-column grid of client quotes with star ratings.
+         * -------------------------------------------------------- */
+        .testimonials {
+            padding: 6rem 0;
+        }
+
+        .testimonials-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        /* Individual testimonial card */
+        .testimonial {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            border-radius: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .testimonial.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Star rating row */
+        .stars {
+            color: var(--orange);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Quote text */
+        .testimonial-content {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Name and role of the reviewer */
+        .testimonial-author h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .testimonial-author p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+
+        /* --------------------------------------------------------
+         * CALL TO ACTION (CTA) / CONTACT SECTION
+         * Large centred headline with contact form below.
+         * -------------------------------------------------------- */
+        .cta {
+            padding: 6rem 0;
+            text-align: center;
+        }
+
+        .cta h2 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+        }
+
+        .cta h2 .highlight {
+            color: var(--orange);
+        }
+
+        .cta p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.7;
+        }
+
+        /* Row of contact info items (email, location) */
+        .contact-info {
+            display: flex;
+            gap: 3rem;
+            justify-content: center;
+            margin-top: 3rem;
+            font-size: 0.95rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Icon prepended via CSS using ::before with class-specific content */
+        .contact-item::before {
+            color: var(--orange);
+        }
+
+        .contact-item.email::before {
+            content: '✉';
+        }
+
+        .contact-item.location::before {
+            content: '🌍';
+        }
+
+
+        /* --------------------------------------------------------
+         * FOOTER
+         * Simple two-row footer with logo, copyright, and links.
+         * -------------------------------------------------------- */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 0 2rem;
+            margin-top: 6rem;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .footer-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+
+
+        /* --------------------------------------------------------
+         * CONTACT FORM
+         * Constrained max-width form centred below the CTA text.
+         * -------------------------------------------------------- */
+        .contact-form {
+            max-width: 600px;
+            margin: 3rem auto 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* Shared styles for text inputs and textarea */
+        input,
+        textarea {
+            width: 100%;
+            padding: 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit; /* Match body font, not browser default */
+            transition: all 0.3s ease;
+        }
+
+        /* Orange border glow on focus */
+        input:focus,
+        textarea:focus {
+            outline: 0;
+            border-color: var(--orange);
+        }
+
+        textarea {
+            resize: vertical;      /* User can resize height, not width */
+            min-height: 150px;
+        }
+
+        /* --------------------------------------------------------
+         * HONEYPOT INPUT
+         * Visually hidden — positioned far off-screen.
+         * Real users never see or fill this in.
+         * Bots that auto-fill all fields will populate it,
+         * allowing server-side spam detection.
+         * -------------------------------------------------------- */
+        .honeypot {
+            position: absolute;
+            left: -9999px;
+        }
+
+        /* --------------------------------------------------------
+         * FORM FEEDBACK MESSAGE
+         * Shown after form submission — success or error state.
+         * Hidden by default; JS adds .show to make it visible.
+         * -------------------------------------------------------- */
+        .form-message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: none;           /* Hidden until .show is added */
+            font-size: 0.95rem;
+        }
+
+        /* Green success state */
+        .form-message.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        /* Red error state */
+        .form-message.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Toggled by JS to make the message visible */
+        .form-message.show {
+            display: block;
+        }
+
+
+        /* --------------------------------------------------------
+         * MOBILE RESPONSIVE OVERRIDES
+         * Applied when viewport width ≤ 768px.
+         * -------------------------------------------------------- */
+        @media (max-width: 768px) {
+
+            /* Show hamburger toggle icon */
+            .mobile-toggle {
+                display: flex;
+            }
+
+            /* Stack nav links vertically, slide in from top */
+            .nav-links {
+                position: fixed;
+                top: 70px;            /* Just below the fixed header */
+                left: 0;
+                right: 0;
+                background: var(--dark-bg);
+                flex-direction: column;
+                padding: 2rem;
+                border-bottom: 1px solid var(--border);
+                /* Off-screen by default; JS toggles .active */
+                transform: translateY(-200%);
+                transition: transform 0.3s ease;
+                gap: 1.5rem;
+            }
+
+            /* Nav visible state — JS adds this class */
+            .nav-links.active {
+                transform: translateY(0);
+            }
+
+            /* Reduce hero padding and font size on small screens */
+            .hero {
+                padding: 9rem 0 5rem;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            /* Stack CTA buttons vertically */
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            /* Stack stats vertically */
+            .hero-stats {
+                flex-direction: column;
+                gap: 2rem;
+            }
+
+            /* All multi-column grids collapse to single column */
+            .features-grid,
+            .projects-grid,
+            .about-grid,
+            .testimonials-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Reduce section heading sizes */
+            .section-header h2 {
+                font-size: 2rem;
+            }
+
+            .cta h2 {
+                font-size: 2rem;
+            }
+
+            /* Stack contact info items vertically */
+            .contact-info {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            /* Stack footer content vertically and centre it */
+            .footer-content {
+                flex-direction: column;
+                gap: 2rem;
+                text-align: center;
+            }
+
+            /* Stack footer links vertically */
+            .footer-links {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+    </style>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+
+<body>
+
+    <!-- ========================================================
+         HEADER / NAVIGATION
+         Fixed to top. Logo left, nav links + CTA right.
+         Hamburger toggle is hidden on desktop, shown on mobile.
+         ======================================================== -->
+    <header>
+        <nav>
+            <!-- Studio wordmark -->
+            <div class="logo">INVINCIBLE</div>
+
+            <!-- Navigation links — id used by JS for mobile toggle -->
+            <ul class="nav-links" id="navLinks">
+              <li><a href="#home">Home</a></li>
+                <li><a href="#services">Services</a></li>
+<!--                 <li><a href="#work">Work</a></li> -->
+                <li><a href="#about">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+                <!-- Highlighted CTA button styled differently from regular links -->
+                <li><a href="#contact" class="btn-cta">Start a Project</a></li>
+            </ul>
+
+            <!-- Hamburger icon — 3 horizontal bars, only visible on mobile -->
+            <div class="mobile-toggle" id="mobileToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+    </header>
+
+
+    <main>
+
+        <!-- ======================================================
+             HERO SECTION
+             Page-opening full-width section with headline, subtitle,
+             two CTA buttons, and three KPI stats.
+             ====================================================== -->
+        <section class="hero" id="home">
+            <div class="container">
+                <div class="hero-content">
+
+                    <!-- Small pill badge above the headline -->
+                    <div class="hero-badge">We craft digital excellence</div>
+
+                    <!-- Main headline — line breaks are intentional for visual impact -->
+                    <h1>
+                        We build brands<br>
+                        that are <span class="highlight">truly<br>invincible</span>
+                    </h1>
+
+                    <!-- Subtitle -->
+                    <p>
+                        From stunning visuals to powerful digital products, we transform
+                        your vision into experiences that captivate, convert, and endure.
+                    </p>
+
+                    <!-- Call-to-action button row -->
+                    <div class="hero-buttons">
+                        <a href="#contact" class="btn btn-primary">Let's Work Together</a>
+                        <a href="#work"    class="btn btn-secondary">View Our Work</a>
+                    </div>
+
+                    <!-- Key stats / social proof numbers -->
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <span class="stat-number">150+</span>
+                            <span class="stat-label">Projects Delivered</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">50+</span>
+                            <span class="stat-label">Happy Clients</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">6+</span>
+                            <span class="stat-label">Years of Craft</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================
+             SERVICES SECTION
+             6 service cards in a 2-column grid.
+             id="services" is the anchor for the nav link.
+             ====================================================== -->
+        <section id="services" class="features">
+            <div class="container">
+
+                <div class="section-header">
+                    <div class="section-label">WHAT WE DO</div>
+                    <h2>Expertise that <span class="highlight">delivers</span></h2>
+                    <p>
+                        We bring together diverse creative and technical disciplines
+                        to build complete digital ecosystems.
+                    </p>
+                </div>
+
+                <div class="features-grid">
+
+                    <!-- Graphics Design -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-palette"></i>
+                        </div>
+                        <h3>Graphics Design</h3>
+                        <p>Brand identities, marketing materials, and visual storytelling that make your brand unforgettable.</p>
+                    </article>
+
+                    <!-- Web Development -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <h3>Web Development</h3>
+                        <p>High-performance websites and web apps built with modern tech stacks that scale with your ambitions.</p>
+                    </article>
+
+                    <!-- Motion Design -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-film"></i>
+                        </div>
+                        <h3>Video Edits</h3>
+                        <p>Captivating animations and video content that bring your stories to life and hold attention.</p>
+                    </article>
+
+                    <!-- App Development -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-mobile"></i>
+                        </div>
+                        <h3>App Development</h3>
+                        <p>Native and cross-platform mobile applications engineered for seamless user experiences.</p>
+                    </article>
+
+                    <!-- UI/UX Design -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-bezier-curve"></i>
+                        </div>
+                        <h3>UI/UX Design</h3>
+                        <p>Research-driven interfaces that delight users and drive measurable business outcomes.</p>
+                    </article>
+
+                    <!-- AI Products -->
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                          <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <h3>AI Products</h3>
+                        <p>Intelligent solutions powered by cutting-edge AI that automate, predict, and transform industries.</p>
+                    </article>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================
+             PORTFOLIO / WORK SECTION
+             4 project cards, 2-column grid.
+             id="work" is the anchor for the nav link.
+             ====================================================== -->
+<!--         <section id="work" class="projects">
+            <div class="container">
+
+                <div class="section-header">
+                    <div class="section-label">SELECTED WORK</div>
+                    <h2>Projects that <span class="highlight">speak volumes</span></h2>
+                </div>
+
+                <div class="projects-grid">
+
+                
+                    <article class="project-card">
+                        <div class="project-image">
+                            <div class="project-icon">↗</div>
+                        </div>
+                        <div class="project-info">
+                            <div class="project-tags">WEB DEVELOPMENT · UI/UX</div>
+                            <h3>Nova Finance</h3>
+                            <p>A next-gen fintech platform with intuitive dashboards and real-time analytics.</p>
+                        </div>
+                    </article>
+
+              
+                    <article class="project-card">
+                        <div class="project-image">
+                            <div class="project-icon">↗</div>
+                        </div>
+                        <div class="project-info">
+                            <div class="project-tags">MOTION DESIGN · BRANDING</div>
+                            <h3>Meridian Studios</h3>
+                            <p>Complete brand identity and motion system for an award-winning film studio.</p>
+                        </div>
+                    </article>
+
+                
+                    <article class="project-card">
+                        <div class="project-image">
+                            <div class="project-icon">↗</div>
+                        </div>
+                        <div class="project-info">
+                            <div class="project-tags">AI PRODUCTS · APP DEVELOPMENT</div>
+                            <h3>PulseAI Health</h3>
+                            <p>AI-powered health monitoring app processing 10M+ data points daily.</p>
+                        </div>
+                    </article>
+
+                
+                    <article class="project-card">
+                        <div class="project-image">
+                            <div class="project-icon">↗</div>
+                        </div>
+                        <div class="project-info">
+                            <div class="project-tags">WEB DEVELOPMENT · GRAPHICS</div>
+                            <h3>Aether Commerce</h3>
+                            <p>Luxury e-commerce experience with 200% increase in conversion rates.</p>
+                        </div>
+                    </article>
+
+                </div>
+            </div>
+        </section> -->
+
+
+        <!-- ======================================================
+             ABOUT / VALUES SECTION
+             Mission statement + 4 core values in a 2-column grid.
+             id="about" is the anchor for the nav link.
+             ====================================================== -->
+        <section id="about" class="about">
+            <div class="container">
+
+                <div class="section-header">
+                    <div class="section-label">WHY INVINCIBLE</div>
+                    <h2>We don't just build —<br>we <span class="highlight">dominate</span></h2>
+                    <p>
+                        Invincible was founded on one belief: great design and great engineering
+                        aren't luxuries — they're competitive advantages. We partner with ambitious
+                        brands to create digital experiences that don't just compete, they conquer.
+                    </p>
+                    <p style="margin-top: 1rem;">
+                        Our multidisciplinary team spans designers, developers, motion artists,
+                        and AI engineers — all driven by the obsession to make your brand unstoppable.
+                    </p>
+                </div>
+
+                <div class="about-grid">
+
+                    <!-- Value 1: Quality -->
+<article class="value-card">
+    <div class="value-icon">
+        <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    <h3>Uncompromising Quality</h3>
+    <p>Every pixel, every line of code meets our relentless standard.</p>
+</article>
+
+<!-- Value 2: Speed -->
+<article class="value-card">
+    <div class="value-icon">
+        <i class="fa-solid fa-bolt"></i>
+    </div>
+    <h3>Rapid Execution</h3>
+    <p>We move fast without breaking things. Your timeline matters.</p>
+</article>
+
+<!-- Value 3: Partnership -->
+<article class="value-card">
+    <div class="value-icon">
+        <i class="fa-solid fa-users"></i>
+    </div>
+    <h3>True Partnership</h3>
+    <p>We're not vendors — we're invested partners in your success.</p>
+</article>
+
+<!-- Value 4: Results -->
+<article class="value-card">
+    <div class="value-icon">
+        <i class="fa-solid fa-trophy"></i>
+    </div>
+    <h3>Proven Results</h3>
+    <p>Our work drives real metrics: more users, more revenue, more growth.</p>
+</article>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================
+             TESTIMONIALS SECTION
+             3 client quotes in a 3-column grid.
+             ====================================================== -->
+<!-- <section class="testimonials">
+    <div class="container">
+
+        <div class="section-header">
+            <div class="section-label">CLIENT LOVE</div>
+            <h2>Words from those who <span class="highlight">trust us</span></h2>
+        </div>
+
+        <div class="testimonials-grid">
+
+          
+            <article class="testimonial">
+                <div class="stars">★★★★★</div>
+                <div class="testimonial-content">
+                    "Invincible didn't just build our platform — they redefined our entire
+                    digital presence. Our conversion rate tripled."
+                </div>
+                <div class="testimonial-author">
+                    <img src="https://i.pravatar.cc/80?img=32" alt="Sarah Chen">
+                    <div>
+                        <h4>Sarah Chen</h4>
+                        <p>CEO, Nova Finance</p>
+                    </div>
+                </div>
+            </article>
+
+        
+            <article class="testimonial">
+                <div class="stars">★★★★★</div>
+                <div class="testimonial-content">
+                    "Their motion design work gave our brand a soul. The animations they
+                    created became the centrepiece of our launch campaign."
+                </div>
+                <div class="testimonial-author">
+                    <img src="https://i.pravatar.cc/80?img=12" alt="Marcus Webb">
+                    <div>
+                        <h4>Marcus Webb</h4>
+                        <p>Creative Director, Meridian Studios</p>
+                    </div>
+                </div>
+            </article>
+
+        
+            <article class="testimonial">
+                <div class="stars">★★★★★</div>
+                <div class="testimonial-content">
+                    "Working with Invincible felt like adding a world-class team to our
+                    company. They truly care about results."
+                </div>
+                <div class="testimonial-author">
+                    <img src="https://i.pravatar.cc/80?img=45" alt="Amira Patel">
+                    <div>
+                        <h4>Amira Patel</h4>
+                        <p>Founder, PulseAI Health</p>
+                    </div>
+                </div>
+            </article>
+
+        </div>
+    </div>
+</section> -->
+        <!-- ======================================================
+             CALL TO ACTION (CTA) + CONTACT FORM
+             Large closing headline encouraging project enquiries,
+             followed by the contact form.
+             id="contact" is the anchor for the nav link.
+             ====================================================== -->
+        <section id="contact" class="cta">
+            <div class="container">
+
+                <!-- Eyebrow label -->
+                <div class="section-label">LET'S TALK</div>
+
+                <!-- Closing headline -->
+                <h2>
+                    Ready to become<br>
+                    <span class="highlight">invincible</span>?
+                </h2>
+
+                <!-- Sub-copy -->
+                <p>
+                    Tell us about your project and let's create something extraordinary
+                    together. No fluff, no bureaucracy — just great work.
+                </p>
+
+                <!-- Scroll-to-form CTA button -->
+                <a href="#contact-form" class="btn btn-primary">Start Your Project</a>
+
+                <!-- Contact detail row -->
+                <div class="contact-info">
+                    <div class="contact-item location">Available Worldwide</div>
+                </div>
+
+
+                <!-- ------------------------------------------
+                     CONTACT FORM
+                     Submitted via AJAX (fetch API) in the JS below.
+                     The form posts to this same file (index.php).
+                     
+                     Fields:
+                       - website  : honeypot (hidden from real users)
+                       - name     : required text
+                       - email    : required email
+                       - message  : required textarea
+                     ------------------------------------------ -->
+                <form class="contact-form" id="contactForm">
+
+                    <!-- Feedback message area (success / error) — hidden until JS reveals it -->
+                    <div class="form-message" id="formMessage"></div>
+
+                    <!-- HONEYPOT: hidden field — bots fill it, PHP rejects the submission -->
+                    <input
+                        type="text"
+                        name="website"
+                        class="honeypot"
+                        tabindex="-1"
+                        autocomplete="off"
+                    >
+
+                    <!-- Name field -->
+                    <div class="form-group">
+                        <label for="name">Your Name</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+
+                    <!-- Email field -->
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+
+                    <!-- Project description textarea -->
+                    <div class="form-group">
+                        <label for="message">Tell Us About Your Project</label>
+                        <textarea id="message" name="message" required></textarea>
+                    </div>
+
+                    <!-- Submit button — disabled during AJAX in-flight -->
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- ==========================================================
+         FOOTER
+         Logo + copyright left, social links right.
+         ========================================================== -->
+<footer>
+  <style>
+    /* ── FOOTER ───────────────────────────────────────────────── */
 footer {
     border-top: 1px solid var(--border-subtle);
     padding: 5rem 0 2.5rem;
@@ -1162,563 +1775,20 @@ footer::before {
 
 .footer-legal a:hover { color: var(--text-primary); }
 
-/* ── RESPONSIVE ───────────────────────────────────────────── */
-@media (max-width: 1024px) {
-    .features-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
 }
 
-@media (max-width: 768px) {
-    .mobile-toggle { display: flex; }
+/* ── KEYFRAMES ────────────────────────────────────────────── */
 
-    .nav-links {
-        position: fixed;
-        top: 68px; left: 0; right: 0;
-        background: rgba(8,8,8,0.98);
-        backdrop-filter: blur(20px);
-        flex-direction: column;
-        padding: 2rem;
-        border-bottom: 1px solid var(--border);
-        transform: translateY(-120%);
-        opacity: 0;
-        transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                    opacity 0.3s ease;
-        gap: 1.5rem;
-        pointer-events: none;
-    }
-
-    .nav-links.active {
-        transform: translateY(0);
-        opacity: 1;
-        pointer-events: all;
-    }
-
-    .hero { padding: 10rem 0 5rem; min-height: auto; }
-    .hero-title { font-size: clamp(2.4rem, 8vw, 3.5rem); }
-    .hero-buttons { flex-direction: column; align-items: center; }
-    .hero-stats { gap: 2.5rem; }
-
-    .features-grid,
-    .projects-grid,
-    .about-grid,
-    .testimonials-grid { grid-template-columns: 1fr; }
-
-    .about::before { display: none; }
-
-    .contact-info { flex-direction: column; align-items: center; gap: 1rem; }
-
-    .footer-top {
-        flex-direction: column;
-        gap: 2.5rem;
-    }
-
-    .footer-social {
-        align-items: flex-start;
-    }
-
-    .footer-bottom {
-        flex-direction: column;
-        gap: 1.25rem;
-        text-align: center;
-    }
-
-    .footer-legal { justify-content: center; }
-
-    .cta::before { font-size: 4rem; }
+/* Rotating gradient border for cards */
+@keyframes border-spin {
+    to { --border-angle: 360deg; }
 }
-
-@media (max-width: 480px) {
-    .container { padding: 0 1.25rem; }
-    .hero-stats { flex-direction: column; gap: 2rem; }
-}
-
-    </style>
-
-    <!-- Lucide icon library (replaces all emoji icons with clean SVGs) -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-
-    <!-- GSAP core + ScrollTrigger plugin -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
-<!---     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>----->
-    <!-- GSAP ScrollTo plugin (used in smooth scroll) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js" defer></script>
-
-    <!-- App logic (runs after all deferred scripts above) -->
-
-</head>
-
-<body>
-
-<!-- ============================================================
-     HEADER
-     ============================================================ -->
-<header>
-    <nav>
-        <a href="#" class="logo">INVINCIBLE<span>.</span></a>
-
-        <ul class="nav-links" id="navLinks">
-            <li><a href="#services">Services</a></li>
-            <li><a href="#work">Work</a></li>
-            <li><a href="#about">About</a></li>
-            <li><a href="#contact">Contact</a></li>
-            <li><a href="#contact" class="btn-cta">Start a Project</a></li>
-        </ul>
-
-        <!-- Hamburger — 3 animated bars, JS toggles .active -->
-        <div class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu" role="button" tabindex="0">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-    </nav>
-</header>
-
-
-<main>
-
-    <!-- ==========================================================
-         HERO
-         ========================================================== -->
-    <section class="hero">
-        <!-- Decorative floating gradient orbs (actual divs so GSAP parallax works) -->
-        <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
-        <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
-
-        <div class="container">
-            <div class="hero-content">
-
-                <!-- Badge -->
-                <div class="hero-badge">
-                    <i data-lucide="zap" class="badge-icon"></i>
-                    We craft digital excellence
-                </div>
-
-                <!-- Headline — each .line-wrap has overflow:hidden so GSAP
-                     can slide .line-inner up from below for a wipe-reveal -->
-                <h1 class="hero-title">
-                    <span class="line-wrap"><span class="line-inner">We build brands</span></span>
-                    <span class="line-wrap"><span class="line-inner">that are <span class="highlight">truly</span></span></span>
-                    <span class="line-wrap"><span class="line-inner"><span class="highlight">invincible</span></span></span>
-                </h1>
-
-                <p class="hero-subtitle">
-                    From stunning visuals to powerful digital products, we transform
-                    your vision into experiences that captivate, convert, and endure.
-                </p>
-
-                <div class="hero-buttons">
-                    <a href="#contact" class="btn btn-primary">
-                        <i data-lucide="arrow-right"></i>
-                        Let's Work Together
-                    </a>
-                    <a href="#work" class="btn btn-secondary">
-                        <i data-lucide="play"></i>
-                        View Our Work
-                    </a>
-                </div>
-
-                <div class="hero-stats">
-                    <div class="stat">
-                        <span class="stat-number">150+</span>
-                        <span class="stat-label">Projects Delivered</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-number">50+</span>
-                        <span class="stat-label">Happy Clients</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-number">6+</span>
-                        <span class="stat-label">Years of Craft</span>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ==========================================================
-         MARQUEE TICKER STRIP
-         Infinite scrolling brand/service keywords between sections
-         ========================================================== -->
-    <div class="marquee-strip" aria-hidden="true">
-        <!-- Track is duplicated so the loop is seamless -->
-        <div class="marquee-track">
-            <span class="marquee-item">Design</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Development</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Motion</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">AI Products</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Branding</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">UI / UX</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Mobile Apps</span>
-            <span class="marquee-item dot">·</span>
-            <!-- Duplicate for seamless loop -->
-            <span class="marquee-item">Design</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Development</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Motion</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">AI Products</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Branding</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">UI / UX</span>
-            <span class="marquee-item dot">·</span>
-            <span class="marquee-item">Mobile Apps</span>
-            <span class="marquee-item dot">·</span>
-        </div>
-    </div>
-
-
-    <!-- ==========================================================
-         SERVICES SECTION
-         ========================================================== -->
-    <section id="services" class="features">
-        <div class="container">
-
-            <div class="section-header">
-                <div class="section-label">What We Do</div>
-                <h2>Expertise that <span class="highlight">delivers</span></h2>
-                <p>We bring together diverse creative and technical disciplines to build complete digital ecosystems.</p>
-            </div>
-
-            <div class="features-grid">
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="palette"></i>
-                    </div>
-                    <h3>Graphics Design</h3>
-                    <p>Brand identities, marketing materials, and visual storytelling that make your brand unforgettable.</p>
-                </article>
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="globe"></i>
-                    </div>
-                    <h3>Web Development</h3>
-                    <p>High-performance websites and web apps built with modern tech stacks that scale with your ambitions.</p>
-                </article>
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="clapperboard"></i>
-                    </div>
-                    <h3>Motion Design</h3>
-                    <p>Captivating animations and video content that bring your stories to life and hold attention.</p>
-                </article>
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="smartphone"></i>
-                    </div>
-                    <h3>App Development</h3>
-                    <p>Native and cross-platform mobile applications engineered for seamless user experiences.</p>
-                </article>
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="gem"></i>
-                    </div>
-                    <h3>UI / UX Design</h3>
-                    <p>Research-driven interfaces that delight users and drive measurable business outcomes.</p>
-                </article>
-
-                <article class="feature-card glow-card">
-                    <div class="feature-icon">
-                        <i data-lucide="bot"></i>
-                    </div>
-                    <h3>AI Products</h3>
-                    <p>Intelligent solutions powered by cutting-edge AI that automate, predict, and transform industries.</p>
-                </article>
-
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ==========================================================
-         PORTFOLIO / WORK SECTION
-         ========================================================== -->
-    <section id="work" class="projects">
-        <div class="container">
-
-            <div class="section-header">
-                <div class="section-label">Selected Work</div>
-                <h2>Projects that <span class="highlight">speak volumes</span></h2>
-            </div>
-
-            <div class="projects-grid">
-
-                <article class="project-card glow-card">
-                    <div class="project-image">
-                        <div class="project-icon">
-                            <i data-lucide="arrow-up-right"></i>
-                        </div>
-                    </div>
-                    <div class="project-info">
-                        <div class="project-tags">Web Development · UI/UX</div>
-                        <h3>Nova Finance</h3>
-                        <p>A next-gen fintech platform with intuitive dashboards and real-time analytics.</p>
-                    </div>
-                </article>
-
-                <article class="project-card glow-card">
-                    <div class="project-image">
-                        <div class="project-icon">
-                            <i data-lucide="arrow-up-right"></i>
-                        </div>
-                    </div>
-                    <div class="project-info">
-                        <div class="project-tags">Motion Design · Branding</div>
-                        <h3>Meridian Studios</h3>
-                        <p>Complete brand identity and motion system for an award-winning film studio.</p>
-                    </div>
-                </article>
-
-                <article class="project-card glow-card">
-                    <div class="project-image">
-                        <div class="project-icon">
-                            <i data-lucide="arrow-up-right"></i>
-                        </div>
-                    </div>
-                    <div class="project-info">
-                        <div class="project-tags">AI Products · App Development</div>
-                        <h3>PulseAI Health</h3>
-                        <p>AI-powered health monitoring app processing 10M+ data points daily.</p>
-                    </div>
-                </article>
-
-                <article class="project-card glow-card">
-                    <div class="project-image">
-                        <div class="project-icon">
-                            <i data-lucide="arrow-up-right"></i>
-                        </div>
-                    </div>
-                    <div class="project-info">
-                        <div class="project-tags">Web Development · Graphics</div>
-                        <h3>Aether Commerce</h3>
-                        <p>Luxury e-commerce experience with 200% increase in conversion rates.</p>
-                    </div>
-                </article>
-
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ==========================================================
-         ABOUT / VALUES SECTION
-         ========================================================== -->
-    <section id="about" class="about">
-        <div class="container">
-
-            <div class="section-header">
-                <div class="section-label">Why Invincible</div>
-                <h2>We don't just build —<br>we <span class="highlight">dominate</span></h2>
-                <p>
-                    Invincible was founded on one belief: great design and great engineering
-                    aren't luxuries — they're competitive advantages. We partner with ambitious
-                    brands to create digital experiences that don't just compete, they conquer.
-                </p>
-                <p style="margin-top: 1rem; color: #888; font-weight: 300;">
-                    Our multidisciplinary team spans designers, developers, motion artists,
-                    and AI engineers — all driven by the obsession to make your brand unstoppable.
-                </p>
-            </div>
-
-            <div class="about-grid">
-
-                <article class="value-card glow-card">
-                    <div class="value-icon">
-                        <i data-lucide="shield-check"></i>
-                    </div>
-                    <h3>Uncompromising Quality</h3>
-                    <p>Every pixel, every line of code meets our relentless standard.</p>
-                </article>
-
-                <article class="value-card glow-card">
-                    <div class="value-icon">
-                        <i data-lucide="zap"></i>
-                    </div>
-                    <h3>Rapid Execution</h3>
-                    <p>We move fast without breaking things. Your timeline matters.</p>
-                </article>
-
-                <article class="value-card glow-card">
-                    <div class="value-icon">
-                        <i data-lucide="users"></i>
-                    </div>
-                    <h3>True Partnership</h3>
-                    <p>We're not vendors — we're invested partners in your success.</p>
-                </article>
-
-                <article class="value-card glow-card">
-                    <div class="value-icon">
-                        <i data-lucide="trophy"></i>
-                    </div>
-                    <h3>Proven Results</h3>
-                    <p>Our work drives real metrics: more users, more revenue, more growth.</p>
-                </article>
-
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ==========================================================
-         TESTIMONIALS
-         ========================================================== -->
-    <section class="testimonials">
-        <div class="container">
-
-            <div class="section-header">
-                <div class="section-label">Client Love</div>
-                <h2>Words from those who <span class="highlight">trust us</span></h2>
-            </div>
-
-            <div class="testimonials-grid">
-
-                <article class="testimonial glow-card">
-                    <!-- Star rating rendered with filled star icons -->
-                    <div class="stars">
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                    </div>
-                    <div class="testimonial-content">
-                        "Invincible didn't just build our platform — they redefined our entire
-                        digital presence. Our conversion rate tripled."
-                    </div>
-                    <div class="testimonial-author">
-                        <h4>Sarah Chen</h4>
-                        <p>CEO, Nova Finance</p>
-                    </div>
-                </article>
-
-                <article class="testimonial glow-card">
-                    <div class="stars">
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                    </div>
-                    <div class="testimonial-content">
-                        "Their motion design work gave our brand a soul. The animations they created
-                        became the centrepiece of our entire launch campaign."
-                    </div>
-                    <div class="testimonial-author">
-                        <h4>Marcus Webb</h4>
-                        <p>Creative Director, Meridian Studios</p>
-                    </div>
-                </article>
-
-                <article class="testimonial glow-card">
-                    <div class="stars">
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                        <i data-lucide="star"></i>
-                    </div>
-                    <div class="testimonial-content">
-                        "Working with Invincible felt like adding a world-class team to our
-                        company. They truly care about results."
-                    </div>
-                    <div class="testimonial-author">
-                        <h4>Amira Patel</h4>
-                        <p>Founder, PulseAI Health</p>
-                    </div>
-                </article>
-
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ==========================================================
-         CTA + CONTACT FORM
-         ========================================================== -->
-    <section id="contact" class="cta">
-        <div class="container">
-
-            <div class="section-label">Let's Talk</div>
-
-            <h2>
-                Ready to become<br>
-                <span class="highlight">invincible</span>?
-            </h2>
-
-            <p>
-                Tell us about your project and let's create something extraordinary together.
-                No fluff, no bureaucracy — just great work.
-            </p>
-
-            <a href="#contactForm" class="btn btn-primary">
-                <i data-lucide="send"></i>
-                Start Your Project
-            </a>
-
-            <div class="contact-info">
-                <div class="contact-item">
-                    <i data-lucide="mail"></i>
-                    hello@invincible.studio
-                </div>
-                <div class="contact-item">
-                    <i data-lucide="map-pin"></i>
-                    Available Worldwide
-                </div>
-            </div>
-
-            <!-- Contact Form -->
-            <form class="contact-form" id="contactForm" novalidate>
-                <div class="form-message" id="formMessage" role="alert"></div>
-
-                <!-- Honeypot — hidden from real users, catches bots -->
-                <input type="text" name="website" class="honeypot" tabindex="-1" autocomplete="off" aria-hidden="true">
-
-                <div class="form-group">
-                    <label for="name">Your Name</label>
-                    <input type="text" id="name" name="name" placeholder="Jane Smith" required autocomplete="name">
-                </div>
-
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" placeholder="jane@company.com" required autocomplete="email">
-                </div>
-
-                <div class="form-group">
-                    <label for="message">Tell Us About Your Project</label>
-                    <textarea id="message" name="message" placeholder="We're looking to build…" required></textarea>
-                </div>
-
-                <button type="submit" class="btn btn-primary">
-                    <i data-lucide="send"></i>
-                    Send Message
-                </button>
-            </form>
-
-        </div>
-    </section>
-
-</main>
-
-
-<!-- ============================================================
-     FOOTER — modern layout with social icons + dynamic year
-     ============================================================ -->
-<footer>
+  </style>
     <div class="container">
 
         <!-- Top row: brand left, nav + socials right -->
@@ -1733,30 +1803,27 @@ footer::before {
             <div class="footer-social">
                 <!-- Quick navigation links -->
                 <nav class="footer-nav-group" aria-label="Footer navigation">
-                    <a href="#services">Services</a>
-                    <a href="#work">Work</a>
-                    <a href="#about">About</a>
-                    <a href="#contact">Contact</a>
+
                 </nav>
 
                 <!-- Social media icon links -->
-                <div class="social-links">
-                    <a href="#" class="social-link" aria-label="Twitter / X">
-                        <i data-lucide="twitter"></i>
-                    </a>
-                    <a href="#" class="social-link" aria-label="LinkedIn">
-                        <i data-lucide="linkedin"></i>
-                    </a>
-                    <a href="#" class="social-link" aria-label="Dribbble">
-                        <i data-lucide="dribbble"></i>
-                    </a>
-                    <a href="#" class="social-link" aria-label="GitHub">
-                        <i data-lucide="github"></i>
-                    </a>
-                    <a href="#" class="social-link" aria-label="Instagram">
-                        <i data-lucide="instagram"></i>
-                    </a>
-                </div>
+<div class="social-links">
+    
+    <!-- X (Twitter) -->
+    <a href="#" class="social-link" aria-label="Twitter / X">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M18.244 2H21l-6.5 7.43L22 22h-6.828l-5.34-6.99L3.5 22H1l6.94-7.93L2 2h6.828l4.84 6.36L18.244 2Zm-2.39 18h1.89L8.06 4H6.09l9.764 16Z"/>
+        </svg>
+    </a>
+
+    <!-- Instagram -->
+    <a href="#" class="social-link" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 2A3.75 3.75 0 0 0 4 7.75v8.5A3.75 3.75 0 0 0 7.75 20h8.5A3.75 3.75 0 0 0 20 16.25v-8.5A3.75 3.75 0 0 0 16.25 4h-8.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm4.75-2.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z"/>
+        </svg>
+    </a>
+
+</div>
             </div>
         </div>
 
@@ -1779,473 +1846,159 @@ footer::before {
 </footer>
 
 
- <script defer>
-      /**
- * ============================================================
- * INVINCIBLE STUDIO — app.js
- * ============================================================
- *
- * Sections:
- *   1. Init — Lucide icons + footer year
- *   2. Mobile navigation toggle
- *   3. GSAP page-load timeline (header, hero, stats counter)
- *   4. GSAP ScrollTrigger animations (sections, cards, CTA)
- *   5. Smooth anchor scroll override
- *   6. Contact form AJAX submission
- * ============================================================
- */
 
-/* ============================================================
- * 1. INIT
- * ============================================================ */
-
-document.addEventListener('DOMContentLoaded', () => {
-
-    // ── Lucide Icons ────────────────────────────────────────
-    // Replace every <i data-lucide="..."> with an inline SVG
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-
-    // ── Footer year ─────────────────────────────────────────
-    // Always correct — no hardcoding
-    const yearEl = document.getElementById('currentYear');
+    <!-- ==========================================================
+         JAVASCRIPT
+         Three independent behaviours:
+           1. Mobile navigation toggle
+           2. Scroll-triggered card animations (IntersectionObserver)
+           3. Async contact form submission
+           4. Smooth scroll for all in-page anchor links
+         ========================================================== -->
+    <script>
+ const yearEl = document.getElementById('currentYear');
     if (yearEl) yearEl.textContent = new Date().getFullYear();
+        /* --------------------------------------------------------
+         * 1. MOBILE NAVIGATION TOGGLE
+         * Clicking the hamburger icon toggles the .active class
+         * on the nav links list, which slides it into view via CSS.
+         * Clicking any nav link also closes the menu.
+         * -------------------------------------------------------- */
+        const mobileToggle = document.getElementById('mobileToggle');
+        const navLinks     = document.getElementById('navLinks');
 
-
-    /* ========================================================
-     * 2. MOBILE NAVIGATION TOGGLE
-     * ======================================================== */
-    const mobileToggle = document.getElementById('mobileToggle');
-    const navLinks     = document.getElementById('navLinks');
-
-    if (mobileToggle && navLinks) {
+        // Toggle the mobile nav open/closed when hamburger is clicked
         mobileToggle.addEventListener('click', () => {
-            const isOpen = navLinks.classList.toggle('active');
-            mobileToggle.classList.toggle('active', isOpen);
-            // Prevent body scroll while nav is open
-            document.body.style.overflow = isOpen ? 'hidden' : '';
+            navLinks.classList.toggle('active');
         });
 
-        // Close nav on any link click
-        navLinks.querySelectorAll('a').forEach(link => {
+        // Close the mobile nav whenever any link inside it is clicked
+        document.querySelectorAll('.nav-links a').forEach(link => {
             link.addEventListener('click', () => {
                 navLinks.classList.remove('active');
-                mobileToggle.classList.remove('active');
-                document.body.style.overflow = '';
             });
         });
-    }
 
 
-    /* ========================================================
-     * 3. GSAP PAGE-LOAD TIMELINE
-     * Runs immediately on page open — no ScrollTrigger needed.
-     * ======================================================== */
+        /* --------------------------------------------------------
+         * 2. SCROLL-TRIGGERED CARD ANIMATIONS
+         * IntersectionObserver watches each card element.
+         * When a card enters the viewport (threshold: 15%),
+         * the .visible class is added after a staggered delay
+         * (index × 100ms) so cards animate in sequentially.
+         * The CSS handles the actual opacity/transform transition.
+         * -------------------------------------------------------- */
+        const observerOptions = {
+            threshold:   0.15,              // Trigger when 15% of element is visible
+            rootMargin: '0px 0px -50px 0px' // Shrink the bottom of the viewport trigger area
+        };
 
-    // Register ScrollTrigger plugin
-    gsap.registerPlugin(ScrollTrigger);
-
-    // -- Header slide down --
-    gsap.from('header', {
-        y: -80,
-        opacity: 0,
-        duration: 1,
-        ease: 'power3.out'
-    });
-
-    // -- Hero orchestrated timeline --
-    // Each element cascades in after the previous one
-    const heroTl = gsap.timeline({ delay: 0.3 });
-
-    heroTl
-        // Badge pill fades up
-        .from('.hero-badge', {
-            opacity: 0,
-            y: 25,
-            duration: 0.7,
-            ease: 'power3.out'
-        })
-        // Headline lines: each .line-inner slides up from below its
-        // .line-wrap overflow:hidden container — the clip-masked wipe effect
-        .from('.line-inner', {
-            y: '115%',
-            opacity: 0,
-            duration: 1.1,
-            stagger: 0.13,
-            ease: 'power4.out'
-        }, '-=0.3')
-        // Subtitle paragraph
-        .from('.hero-subtitle', {
-            opacity: 0,
-            y: 20,
-            duration: 0.8,
-            ease: 'power3.out'
-        }, '-=0.5')
-        // CTA buttons staggered
-        .from('.hero-buttons .btn', {
-            opacity: 0,
-            y: 18,
-            stagger: 0.12,
-            duration: 0.65,
-            ease: 'power3.out'
-        }, '-=0.4')
-        // Stats row
-        .from('.hero-stats', {
-            opacity: 0,
-            y: 15,
-            duration: 0.6,
-            ease: 'power2.out'
-        }, '-=0.35');
-
-    // -- Stat number counter animation --
-    // Triggers when the stat section enters viewport
-    document.querySelectorAll('.stat-number').forEach(el => {
-        // Store the final display value (e.g. "150+", "50+", "6+")
-        const target    = el.textContent.trim();
-        const numericPart = parseFloat(target.replace(/[^0-9.]/g, ''));
-        const suffix      = target.replace(/[0-9.]/g, ''); // e.g. "+", "yr"
-
-        gsap.fromTo(
-            el,
-            { textContent: 0 },
-            {
-                textContent: numericPart,
-                duration: 2.2,
-                ease: 'power2.out',
-                snap: { textContent: 1 },
-                // Format output with original suffix
-                onUpdate: function () {
-                    el.textContent = Math.round(this.targets()[0].textContent) + suffix;
-                },
-                scrollTrigger: {
-                    trigger: el,
-                    start: 'top 85%',
-                    once: true // Only fires once
-                }
-            }
-        );
-    });
-
-
-    /* ========================================================
-     * 4. GSAP SCROLLTRIGGER ANIMATIONS
-     * Elements animate in as they enter the viewport.
-     * ======================================================== */
-
-    // Helper: generic stagger-reveal for a list of elements
-    function revealStagger(selector, xOffset = 0) {
-        const els = gsap.utils.toArray(selector);
-        if (!els.length) return;
-
-        gsap.from(els, {
-            opacity: 0,
-            y: 50,
-            x: xOffset,
-            stagger: 0.1,
-            duration: 0.9,
-            ease: 'power3.out',
-            scrollTrigger: {
-                trigger: els[0].closest('section') || els[0],
-                start: 'top 82%',
-                once: true
-            }
-        });
-    }
-
-    // -- Section headers: label + h2 + p cascade --
-    gsap.utils.toArray('.section-header').forEach(header => {
-        const children = Array.from(header.children);
-        gsap.from(children, {
-            opacity: 0,
-            y: 35,
-            stagger: 0.12,
-            duration: 0.85,
-            ease: 'power3.out',
-            scrollTrigger: {
-                trigger: header,
-                start: 'top 85%',
-                once: true
-            }
-        });
-    });
-
-    // -- Marquee strip subtle fade-in --
-    gsap.from('.marquee-strip', {
-        opacity: 0,
-        duration: 0.8,
-        scrollTrigger: { trigger: '.marquee-strip', start: 'top 95%', once: true }
-    });
-
-    // -- Feature cards: 3-column staggered --
-    gsap.from('.feature-card', {
-        opacity: 0,
-        y: 55,
-        stagger: {
-            each: 0.08,
-            from: 'start'
-        },
-        duration: 0.85,
-        ease: 'power3.out',
-        scrollTrigger: {
-            trigger: '.features-grid',
-            start: 'top 80%',
-            once: true
-        },
-        // Remove the CSS initial opacity:0 / transform after animation
-        onComplete: () => {
-            document.querySelectorAll('.feature-card').forEach(el => {
-                el.style.opacity = '';
-                el.style.transform = '';
-            });
-        }
-    });
-
-    // -- Project cards: slight scale + fade --
-    gsap.from('.project-card', {
-        opacity: 0,
-        y: 50,
-        scale: 0.97,
-        stagger: 0.12,
-        duration: 0.9,
-        ease: 'power3.out',
-        scrollTrigger: {
-            trigger: '.projects-grid',
-            start: 'top 80%',
-            once: true
-        }
-    });
-
-    // -- About intro text (two paragraphs in section-header) --
-    // Already covered by the section-header loop above
-
-    // -- Value cards: odd cards come from left, even from right --
-    gsap.utils.toArray('.value-card').forEach((card, i) => {
-        gsap.from(card, {
-            opacity: 0,
-            x: i % 2 === 0 ? -40 : 40,
-            y: 20,
-            duration: 0.9,
-            ease: 'power3.out',
-            scrollTrigger: {
-                trigger: card,
-                start: 'top 85%',
-                once: true
-            }
-        });
-    });
-
-    // -- Testimonials: stagger with slight rotation --
-    gsap.from('.testimonial', {
-        opacity: 0,
-        y: 45,
-        rotateX: 8,         // Subtle 3D tilt on entry
-        stagger: 0.13,
-        duration: 0.85,
-        ease: 'power3.out',
-        scrollTrigger: {
-            trigger: '.testimonials-grid',
-            start: 'top 80%',
-            once: true
-        }
-    });
-
-    // -- CTA section: headline scales up from slightly smaller --
-    const ctaTl = gsap.timeline({
-        scrollTrigger: {
-            trigger: '.cta',
-            start: 'top 70%',
-            once: true
-        }
-    });
-
-    ctaTl
-        .from('.cta h2', {
-            opacity: 0,
-            scale: 0.88,
-            y: 30,
-            duration: 1.1,
-            ease: 'power4.out'
-        })
-        .from('.cta p', {
-            opacity: 0,
-            y: 20,
-            duration: 0.8,
-            ease: 'power3.out'
-        }, '-=0.5')
-        .from('.cta .btn', {
-            opacity: 0,
-            y: 15,
-            duration: 0.6,
-            ease: 'power3.out'
-        }, '-=0.4')
-        .from('.contact-info', {
-            opacity: 0,
-            y: 15,
-            duration: 0.6,
-            ease: 'power3.out'
-        }, '-=0.4')
-        .from('.contact-form', {
-            opacity: 0,
-            y: 25,
-            duration: 0.8,
-            ease: 'power3.out'
-        }, '-=0.3');
-
-    // -- Footer: graceful fade-up --
-    gsap.from('footer .footer-brand, footer .footer-social', {
-        opacity: 0,
-        y: 30,
-        stagger: 0.15,
-        duration: 0.8,
-        ease: 'power3.out',
-        scrollTrigger: {
-            trigger: 'footer',
-            start: 'top 90%',
-            once: true
-        }
-    });
-
-    gsap.from('.footer-bottom', {
-        opacity: 0,
-        duration: 0.7,
-        ease: 'power2.out',
-        scrollTrigger: {
-            trigger: '.footer-bottom',
-            start: 'top 95%',
-            once: true
-        }
-    });
-
-    // -- Parallax on hero orbs (scrub-based depth effect) --
-    gsap.to('.hero-orb-1', {
-        y: -120,
-        ease: 'none',
-        scrollTrigger: {
-            trigger: '.hero',
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 1.5
-        }
-    });
-
-    gsap.to('.hero-orb-2', {
-        y: -80,
-        ease: 'none',
-        scrollTrigger: {
-            trigger: '.hero',
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 2
-        }
-    });
-
-    // -- Horizontal scroll-linked pin for projects on wide screens --
-    // Only active on desktop where the projects are a 2-col grid
-    if (window.innerWidth > 1024) {
-        // Subtle horizontal shift on project cards as they scroll
-        gsap.utils.toArray('.project-card').forEach((card, i) => {
-            gsap.from(card, {
-                x: i % 2 === 0 ? -20 : 20,
-                scrollTrigger: {
-                    trigger: card,
-                    start: 'top 85%',
-                    end: 'top 50%',
-                    scrub: 1.5,
-                    once: false
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    // Stagger each card's animation by 100ms × its index
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, index * 100);
                 }
             });
+        }, observerOptions);
+
+        // Observe all animatable card elements
+        document.querySelectorAll('.feature-card, .project-card, .value-card, .testimonial').forEach(el => {
+            observer.observe(el);
         });
-    }
 
 
-    /* ========================================================
-     * 5. SMOOTH ANCHOR SCROLL
-     * Overrides default anchor jump to account for fixed header.
-     * ======================================================== */
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            const href   = this.getAttribute('href');
-            const target = document.querySelector(href);
-            if (!target) return;
+        /* --------------------------------------------------------
+         * 3. ASYNC CONTACT FORM SUBMISSION
+         * Intercepts the form's default submit event, sends the
+         * form data to this same PHP file via fetch (AJAX POST),
+         * then shows a success or error message without a page reload.
+         * -------------------------------------------------------- */
+        const contactForm  = document.getElementById('contactForm');
+        const formMessage  = document.getElementById('formMessage');
 
-            e.preventDefault();
-
-            const headerH = document.querySelector('header')?.offsetHeight || 80;
-            const top     = target.getBoundingClientRect().top + window.pageYOffset - headerH - 20;
-
-            // Use GSAP for smooth scroll so it integrates with other animations
-            gsap.to(window, {
-                scrollTo: { y: top },
-                duration: 1,
-                ease: 'power3.inOut'
-            });
-        });
-    });
-
-
-    /* ========================================================
-     * 6. CONTACT FORM — AJAX SUBMISSION
-     * POSTs form data to index.php, shows feedback inline.
-     * ======================================================== */
-    const contactForm = document.getElementById('contactForm');
-    const formMessage = document.getElementById('formMessage');
-
-    if (contactForm && formMessage) {
         contactForm.addEventListener('submit', async (e) => {
+
+            // Prevent the browser from doing a full page POST redirect
             e.preventDefault();
 
+            // Collect all form field values into a FormData object
             const formData     = new FormData(contactForm);
-            const submitBtn    = contactForm.querySelector('button[type="submit"]');
+            const submitButton = contactForm.querySelector('button[type="submit"]');
 
-            // Disable button while in-flight
-            submitBtn.disabled     = true;
-            submitBtn.textContent  = 'Sending…';
-
-            // Animate the button slightly
-            gsap.to(submitBtn, { scale: 0.96, duration: 0.15, ease: 'power2.in',
-                onComplete: () => gsap.to(submitBtn, { scale: 1, duration: 0.3, ease: 'back.out(2)' })
-            });
+            // Disable the button and show a loading state to prevent double-submit
+            submitButton.disabled   = true;
+            submitButton.textContent = 'Sending...';
 
             try {
+                // POST the form data to index.php (this file)
                 const response = await fetch('index.php', {
                     method: 'POST',
-                    body: formData
+                    body:   formData
                 });
 
+                // Parse the JSON response from the PHP handler
                 const data = await response.json();
 
-                // Show feedback message
+                // Display the server's message in the feedback area
                 formMessage.textContent = data.message;
-                formMessage.className   = `form-message show ${data.status}`;
 
-                // Animate message entrance
-                gsap.from(formMessage, { opacity: 0, y: -10, duration: 0.4, ease: 'power2.out' });
+                // Apply the appropriate CSS class: 'success' or 'error'
+                // 'show' makes the element visible (overrides display:none)
+                formMessage.className = 'form-message show ' + data.status;
 
                 if (data.status === 'success') {
+                    // Clear the form on success
                     contactForm.reset();
+
+                    // Auto-hide the success message after 5 seconds
                     setTimeout(() => {
-                        gsap.to(formMessage, {
-                            opacity: 0,
-                            duration: 0.4,
-                            onComplete: () => formMessage.classList.remove('show')
-                        });
+                        formMessage.classList.remove('show');
                     }, 5000);
                 }
 
-            } catch {
-                formMessage.textContent = 'Network error — please try again.';
+            } catch (error) {
+                // Network failure or malformed JSON from the server
+                formMessage.textContent = 'An error occurred. Please try again.';
                 formMessage.className   = 'form-message show error';
+
             } finally {
-                submitBtn.disabled    = false;
-                submitBtn.textContent = 'Send Message';
+                // Always re-enable the button regardless of outcome
+                submitButton.disabled    = false;
+                submitButton.textContent = 'Send Message';
             }
         });
-    }
 
-}); // end DOMContentLoaded
 
-      
+        /* --------------------------------------------------------
+         * 4. SMOOTH SCROLL FOR IN-PAGE ANCHOR LINKS
+         * Overrides the default instant jump behaviour for all
+         * links starting with '#'. Accounts for the fixed header
+         * height (80px) so the target section isn't hidden underneath.
+         * -------------------------------------------------------- */
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+
+                // Find the element the anchor points to
+                const target = document.querySelector(this.getAttribute('href'));
+
+                if (target) {
+                    const headerOffset   = 80; // Height of the fixed header in px
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition  = elementPosition + window.pageYOffset - headerOffset;
+
+                    window.scrollTo({
+                        top:      offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
     </script>
+
 </body>
 </html>
