@@ -243,48 +243,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
          Sections are clearly labelled below.
          ======================================================== -->
     <style>
-
-        /* --------------------------------------------------------
-         * FONT IMPORT
-         * Loading Inter from Google Fonts — a clean, versatile
-         * sans-serif used extensively in modern UI design.
-         * Weights: 300 (light) through 900 (black).
-         * -------------------------------------------------------- */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-
-        /* --------------------------------------------------------
-         * GLOBAL RESET
-         * Remove default browser margins/padding and use
-         * border-box sizing so padding doesn't expand element width.
-         * -------------------------------------------------------- */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-
-        /* --------------------------------------------------------
-         * CSS CUSTOM PROPERTIES (DESIGN TOKENS)
-         * Centralised colour/value definitions on :root so they
-         * can be reused throughout and changed in one place.
-         * -------------------------------------------------------- */
         :root {
-            --orange:         #FFA500;  /* Primary brand accent colour */
-            --dark-bg:        #0a0a0a;  /* Page background — near black */
-            --card-bg:        #1a1a1a;  /* Card/panel background */
-            --text-primary:   #fff;     /* Main body text */
-            --text-secondary: #999;     /* Muted/secondary text */
-            --border:         #2a2a2a;  /* Subtle border colour */
+            --orange:         #FFA500;
+            --dark-bg:        #0a0a0a;
+            --card-bg:        #1a1a1a;
+            --text-primary:   #fff; 
+            --text-secondary: #999;
+            --border:         #2a2a2a;
         }
 
-
-        /* --------------------------------------------------------
-         * BASE DOCUMENT STYLES
-         * -------------------------------------------------------- */
-
-        /* Smooth anchor scroll for in-page links (#section) */
         html {
             scroll-behavior: smooth;
         }
@@ -294,36 +269,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: var(--dark-bg);
             color: var(--text-primary);
             line-height: 1.6;
-            overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+            overflow-x: hidden;
         }
-
-
-        /* --------------------------------------------------------
-         * LAYOUT CONTAINER
-         * Constrains content to 1200px max-width and adds
-         * horizontal padding so content doesn't hug the edges
-         * on smaller screens.
-         * -------------------------------------------------------- */
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 1.5rem;
         }
 
-
-        /* --------------------------------------------------------
-         * HEADER & NAVIGATION
-         * Fixed to the top of the viewport with a blur backdrop
-         * so content is visible beneath it as the user scrolls.
-         * -------------------------------------------------------- */
         header {
-            position: fixed;         /* Stays at top while scrolling */
+            position: fixed;        
             top: 0;
             left: 0;
             right: 0;
-            z-index: 1000;           /* Above all page content */
-            background: rgba(10, 10, 10, 0.95); /* Near-opaque dark bg */
-            backdrop-filter: blur(10px);         /* Frosted-glass effect */
+            z-index: 1000;    
+            background: rgba(10, 10, 10, 0.95); 
+            backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border);
         }
 
@@ -335,16 +296,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-width: 1200px;
             margin: 0 auto;
         }
-
-        /* Studio wordmark / logo text */
         .logo {
             font-size: 1.1rem;
             font-weight: 700;
             letter-spacing: 0.5px;
             text-transform: uppercase;
         }
-
-        /* Desktop navigation link list */
         .nav-links {
             display: flex;
             gap: 2.5rem;
@@ -364,7 +321,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: var(--text-primary);
         }
 
-        /* "Start a Project" CTA button in the nav */
         .btn-cta {
             background: var(--orange);
             color: var(--dark-bg);
@@ -381,15 +337,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
         }
 
-        /* Hamburger menu icon — hidden on desktop, shown on mobile */
         .mobile-toggle {
-            display: none;            /* Hidden by default */
+            display: none;
             flex-direction: column;
             gap: 0.35rem;
             cursor: pointer;
         }
-
-        /* Each bar of the hamburger icon */
         .mobile-toggle span {
             width: 24px;
             height: 2px;
@@ -397,21 +350,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transition: all 0.3s ease;
         }
 
-
-        /* --------------------------------------------------------
-         * HERO SECTION
-         * Full-width introductory section with headline, sub-copy,
-         * CTA buttons, and stat counters.
-         * Uses pseudo-elements (::before / ::after) for decorative
-         * radial gradient glows in the background.
-         * -------------------------------------------------------- */
         .hero {
-            padding: 12rem 0 8rem; /* Large top padding clears fixed header */
+            padding: 12rem 0 8rem; 
             position: relative;
             overflow: hidden;
         }
 
-        /* Top-left decorative orange glow */
+  
         .hero::before {
             content: '';
             position: absolute;
@@ -420,10 +365,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 60%;
             height: 60%;
             background: radial-gradient(circle, rgba(255, 165, 0, 0.08) 0%, transparent 70%);
-            pointer-events: none; /* Does not block mouse events */
+            pointer-events: none; 
         }
 
-        /* Bottom-right decorative orange glow */
         .hero::after {
             content: '';
             position: absolute;
@@ -435,7 +379,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pointer-events: none;
         }
 
-        /* Small pill-shaped badge above the headline */
         .hero-badge {
             display: inline-flex;
             align-items: center;
@@ -449,29 +392,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: var(--orange);
         }
 
-        /* Lightning bolt icon prepended to the badge via CSS */
+    
         .hero-badge::before {
             content: '⚡';
             font-size: 1rem;
         }
 
-        /* Centre-aligned hero content, layered above the pseudo-elements */
         .hero-content {
             text-align: center;
             position: relative;
             z-index: 1;
         }
 
-        /* Main headline */
+    
         .hero h1 {
             font-size: 4.5rem;
             font-weight: 800;
             line-height: 1.1;
             margin-bottom: 1.5rem;
-            letter-spacing: -0.02em; /* Tight tracking for large display type */
+            letter-spacing: -0.02em; 
         }
 
-        /* Orange accent on keywords inside the headline */
+      
         .hero h1 .highlight {
             color: var(--orange);
         }
@@ -1211,11 +1153,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- Small pill badge above the headline -->
                     <div class="hero-badge">We craft digital excellence</div>
 
-                    <!-- Main headline — line breaks are intentional for visual impact -->
-                    <h1>
-                        We build brands<br>
-                        that are <span class="highlight">truly<br>invincible</span>
-                    </h1>
+                  <h1 id="typing-text"></h1>
+
+<style>
+#cursor {
+    display: inline-block;
+    margin-left: 1px;
+    animation: blink 3s infinite;
+}
+
+@keyframes blink {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0; }
+}
+</style>
+
+<script>
+const text = `We build brands<br>that are truly<span class="highlight"><br>INVINCIBLE.</span>`;
+const target = document.getElementById("typing-text");
+
+let i = 0;
+let temp = "";
+let isTag = false;
+
+let baseSpeed = 105;     // starting speed
+let minSpeed = 18;      // fastest speed
+let speed = baseSpeed;
+
+const slowZone = "invincible";
+const slowDownOffset = 9; // slow down a few chars before "invincible"
+
+// find where "invincible" starts (ignore HTML tags)
+const plainText = text.replace(/<[^>]*>/g, "");
+const slowIndex = plainText.indexOf(slowZone);
+
+let visibleCharCount = 0;
+
+function typeWriter() {
+    if (i < text.length) {
+        temp += text[i];
+
+        // detect HTML tags
+        if (text[i] === "<") isTag = true;
+        if (text[i] === ">") isTag = false;
+
+        if (!isTag && text[i] !== "<") {
+            visibleCharCount++;
+
+            // 🚀 speed up gradually
+            if (speed > minSpeed) {
+                speed -= 0.5;
+            }
+
+            // 🧠 slow down BEFORE "invincible"
+            if (visibleCharCount >= slowIndex - slowDownOffset && visibleCharCount < slowIndex) {
+                speed = 60;
+            }
+
+            // 🐢 slow typing for "invincible"
+            if (visibleCharCount >= slowIndex) {
+                speed = baseSpeed * 1.5;
+            }
+        }
+
+        target.innerHTML = temp + '<span id="cursor">|</span>';
+
+        i++;
+        setTimeout(typeWriter, isTag ? 0 : speed);
+    } else {
+        target.innerHTML = temp + '<span id="cursor">|</span>';
+    }
+}
+
+window.onload = typeWriter;
+</script>
 
                     <!-- Subtitle -->
                     <p>
@@ -1226,25 +1237,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- Call-to-action button row -->
                     <div class="hero-buttons">
                         <a href="#contact" class="btn btn-primary">Let's Work Together</a>
-                        <a href="#work"    class="btn btn-secondary">View Our Work</a>
+                        <a href="#services"    class="btn btn-secondary">What We Do</a>
                     </div>
 
                     <!-- Key stats / social proof numbers -->
-                    <div class="hero-stats">
-                        <div class="stat">
-                            <span class="stat-number">150+</span>
-                            <span class="stat-label">Projects Delivered</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">50+</span>
-                            <span class="stat-label">Happy Clients</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">6+</span>
-                            <span class="stat-label">Years of Craft</span>
-                        </div>
-                    </div>
-
+<div class="hero-stats">
+    <div class="stat">
+        <span class="stat-number">∞</span>
+        <span class="stat-label">Ideas in Motion</span>
+    </div>
+    <div class="stat">
+        <span class="stat-number">1st</span>
+        <span class="stat-label">Clients Onboarding</span>
+    </div>
+    <div class="stat">
+        <span class="stat-number">24/7</span>
+        <span class="stat-label">Execution Mode</span>
+    </div>
+</div>
                 </div>
             </div>
         </section>
@@ -1558,53 +1568,132 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="contact-item location">Available Worldwide</div>
                 </div>
 
-<form 
-    class="contact-form" 
-    action="mailto:ollyverse01@gmail.com,olamiposiayeriyina@gmail.com"
-    method="POST"
-    enctype="text/plain"
->
 
-    <!-- Feedback message area -->
-    <div class="form-message" id="formMessage"></div>
+<div
+  id="contactFormContainer"
+  style="
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 30px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px var(--orange);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  ">
+  <h2 style="text-align: center; margin-bottom: 20px;">Contact Us</h2>
 
-    <!-- Honeypot -->
-    <input
+  <form
+    id="contactForm"
+    onsubmit="sendEmail(event)"
+    style="display: flex; flex-direction: column; gap: 15px;"
+  >
+    <div>
+      <label for="name" style="display: block; margin-bottom: 5px;">Name</label>
+      <input
         type="text"
-        name="website"
-        class="honeypot"
-        tabindex="-1"
-        autocomplete="off"
+        id="name"
+        required
+        placeholder="Enter your name"
+        style="
+          width: 100%;
+          padding: 10px;
+          border-radius: 10px;
+          border: none;
+          outline: none;
+          background: rgba(255, 255, 255, 0.25);
+          color: #fff;
+        "
+      />
+    </div>
+
+    <div>
+      <label for="email" style="display: block; margin-bottom: 5px;">Your Email</label>
+      <input
+        type="email"
+        id="email"
+        required
+        placeholder="Enter your email"
+        style="
+          width: 100%;
+          padding: 10px;
+          border-radius: 10px;
+          border: none;
+          outline: none;
+          background: rgba(255, 255, 255, 0.25);
+          color: #fff;
+        "
+      />
+    </div>
+
+    <div>
+      <label for="message" style="display: block; margin-bottom: 5px;">Message</label>
+      <textarea
+        id="message"
+        rows="4"
+        required
+        placeholder="Type your message..."
+        style="
+          width: 100%;
+          padding: 10px;
+          border-radius: 10px;
+          border: none;
+          outline: none;
+          background: rgba(255, 255, 255, 0.25);
+          color: #fff;
+          resize: none;
+        "
+      ></textarea>
+    </div>
+
+    <button
+      type="submit"
+      style="
+        background: white;
+        color: var(--orange);
+        border: none;
+        padding: 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background 0.3s ease, transform 0.3s ease;
+      "
+      onmouseover="this.style.background='rgba(0,123,255,1)'; this.style.transform='scale(1.05)'"
+      onmouseout="this.style.background='rgba(0,123,255,0.8)'; this.style.transform='scale(1)'"
     >
-
-    <!-- Name -->
-    <div class="form-group">
-        <label for="name">Your Name</label>
-        <input type="text" id="name" name="Name" required>
-    </div>
-
-    <!-- Email -->
-    <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="Email" required>
-    </div>
-
-    <!-- Message -->
-    <div class="form-group">
-        <label for="message">Tell Us About Your Project</label>
-        <textarea id="message" name="Message" required></textarea>
-    </div>
-
-    <!-- Submit -->
-    <button type="submit" class="btn btn-primary">Send Message</button>
-
-</form>
-                     
-
+      Send Message
+    </button>
+  </form>
+</div>
 
 <script>
-  document.getElementById('contactForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+function sendMail() {
+    // Get form values
+    const name = encodeURIComponent(document.getElementById("name").value);
+    const email = encodeURIComponent(document.getElementById("email").value);
+    const message = encodeURIComponent(document.getElementById("message").value);
+
+    // Construct subject & body
+    const subject = encodeURIComponent(`New message from ${decodeURIComponent(name)}`);
+    const body = encodeURIComponent(
+      `Name: ${decodeURIComponent(name)}\nEmail: ${decodeURIComponent(email)}\n\nMessage:\n${decodeURIComponent(message)}`
+    );
+
+    // Multiple recipients (comma separated)
+    const recipients = "ollyverse01@gmail.com,olamiposiayeriyina@gmail.com";
+
+    const mailtoLink = `mailto:${recipients}?subject=${subject}&body=${body}`;
+
+    // Open email client
+    window.location.href = mailtoLink;
+}
+</script>
+
+<!---  document.getElementById('contactForm').addEventListener('submit', function(e) {
+     e.preventDefault();
 
     // Honeypot check
     if (this.querySelector('[name="website"]').value) return;
@@ -1629,7 +1718,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     msg.textContent = 'Your email client should now open. Send the email to submit your message.';
     msg.style.color = 'green';
   });
-</script>
+</script> --->
             </div>
         </section>
 
